@@ -147,3 +147,52 @@ Every spoils card shows its Resonance and what you'd have after taking it. If ta
 
 ![Spoils with Resonances](shots-v3/20-resonance-spoils.jpg)
 ![The carved action bar](shots-v3/21-carved-action-bar.jpg)
+
+## More D&D at the table (v3.8)
+
+Four 5e rules, each shown where you already look: the roll tray, the hint line's hit chance, and the badges under each unit.
+
+| Rule | How it works here |
+|---|---|
+| **Opportunity attacks** | When a foe walks out of a melee hero's reach, that hero takes a free swing with their melee attack (Brannoc's Tide Hammer, Hesk's Knell). It's a full d20 roll, once per hero per enemy phase. Ysolde's magic can't. A Gutter-Wretch's "slip away" is a Disengage, so it doesn't provoke. |
+| **Flanking** | A melee attack has Advantage when an ally stands directly across the target. Foes flank too, so don't let them surround you. |
+| **Half cover** | A ranged attack whose last tile before the target is a pillar, brazier or body adds +2 to the DC. The hit chance and the roll tray both show "HALF COVER". |
+| **Prone and saving throws** | A wall slam or a crash into a body knocks the victim **Prone**. Melee attacks against them have Advantage, ranged attacks have Disadvantage, and standing up costs half their movement. Heroes stand when they next move; foes stand at the start of their turn. Heroes caught by lamp fire or the Tide Sermon roll a **DEX saving throw (DC 13)**: success halves the damage, and lamp fire won't set them burning. |
+
+## The critics' round (v3.9)
+
+Three critics read the code and screenshots: a 20-year D&D player and DM, a roguelite designer (Slay the Spire, Hades, Darkest Dungeon), and a reviewer focused on newcomers. Each ranked the five biggest gaps. This round adds the fixes that gave the most for the effort.
+
+**From the D&D veteran**
+- **Down, not dead.** A hero at 0 HP is now DOWN. Their body stays on the board and blocks the tile.
+  - At the start of each party phase they roll a **death save**: d20, 10 or more succeeds. A natural 20 brings them back up at 1 HP. A natural 1 counts as two failures.
+  - Three successes means STABLE. Three failures means they are lost for the rest of the run.
+  - An adjacent ally can use **Help Up** to raise them Prone with 1d4+1 HP, and they can still act that phase.
+  - After the fight, a stable hero rises scarred. A hero still bleeding out rolls the old recovery save.
+- **Bonus actions.** Use Item, Kindle, Throw Lantern and Open Chest are bonus actions now, so drinking a bandage no longer costs your attack. Each hero card shows a BONUS chip.
+
+**From the roguelite designer**
+- **Elite affixes.** Every elite, and 40% of the time the toughest foe at depth 3, carries one of five affixes. Their name changes and they pay 50% more silver.
+  - *Ember-born:* explodes into lamp-fire when it dies.
+  - *Warded:* the first 10 damage it takes is absorbed.
+  - *Tidebound:* heals 4 at the start of each turn it begins in water.
+  - *Choirbound:* each turn ends with +6 Dread to every hero within 2 tiles.
+  - *Swift:* +2 Move.
+- **Loot steers toward your build.** Items of the theme you carry most are twice as likely to show up, so Resonances are something you can build toward rather than stumble into.
+
+**From the newcomer reviewer**
+- **Guide tips.** A short, one-time GUIDE note explains each mechanic the first time it matters: Prone, opportunity attacks, flanking, cover, each telegraphed attack, signature abilities, Resonances, affixes, bonus actions, being Down, and undo. Tips are saved, so you only see each one once.
+- **Numbers where you're looking.**
+  - Every dangerous enemy intent shows its damage range under the icon.
+  - Hovering a target shows a tag on the target itself: hit chance, damage range, **KILL** or **CAN KILL**, and FLANK, COVER, PRONE, ADV or DIS.
+  - For shoves it also draws where the foe will land, labelled SLAM + PRONE, CRASH + PRONE, DROWNS or INTO DEEP WATER.
+  - The enemy info panel now lists the enemy's next move first.
+- **Undo move.** Until a hero acts, the Undo Move slot (or Z) takes their move back. It's not available if the move revealed a hidden foe or picked up the lantern.
+- **A 2× speed toggle** sits next to the ? button, and the game remembers your choice.
+- **Run end.** The screen names the last blow ("The last blood: Brannoc, felled by the Swift Tide-Knight in The Flooded Narthex · Depth 5"), and a **Descend Again** button starts a new run straight away. The title screen no longer says "1 runs".
+
+![Hover tag, damage on intents and a GUIDE tip](shots-v3/22-hover-tag-and-guide.jpg)
+![Down, not dead](shots-v3/23-down-not-dead.jpg)
+![The last blood](shots-v3/24-last-blood.jpg)
+
+Bot check after this round: three full runs reached depths 6, 8 and 6 (before: 5 to 6) with no errors. Help Up and bonus actions make the party a little sturdier, and affixes push back.

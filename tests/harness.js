@@ -84,6 +84,7 @@ W.heroTurn = async (u) => {
     b.onTile(ts[0].x, ts[0].y); await W.battleIdle();
     return true;
   };
+  if (R.heroActions(s, u).includes('help') && await tryAct('help')) return;
   // step out of a marked Tide Sermon lane first, the way a player would
   const lane = R.alive(s, 'enemy').find((e) => e.waveAim && R.inWave(e.waveAim, u))?.waveAim;
   if (lane && !u.moved) {

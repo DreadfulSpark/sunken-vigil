@@ -1,6 +1,6 @@
 import { sfx, musicPlayer } from '../audio.js';
 import { HEROES } from '../data.js';
-import { computeEmbers } from '../rules.js';
+import { computeEmbers, createRun } from '../rules.js';
 import { HEX, FONT_H, FONT_B, makeButton, panel, C } from '../ui.js';
 import { saveMeta } from '../save.js';
 import { shoreBackdrop } from './backdrop.js';
@@ -34,6 +34,12 @@ export default class RunEndScene extends Phaser.Scene {
     const t = this.add.text(W / 2, 64, title, { fontFamily: FONT_H, fontSize: '46px', color: this.won ? HEX.amberHot : HEX.bone, fontStyle: '900', letterSpacing: 4, stroke: '#050b0c', strokeThickness: 8 }).setOrigin(0.5).setAlpha(0);
     this.tweens.add({ targets: t, alpha: 1, y: 58, duration: 1200 });
     this.add.text(W / 2, 106, sub, { fontFamily: FONT_B, fontSize: '17px', color: HEX.amber, fontStyle: 'italic' }).setOrigin(0.5);
+    // what ended it: the last blow, named
+    const f = run.stats.fellTo;
+    if (!this.won && !this.abandoned && f) {
+      const what = f.by ? `felled by the ${f.by}` : f.source ? `taken by ${f.source}` : 'fell';
+      this.add.text(W / 2, 128, `The last blood: ${f.hero}, ${what} in ${f.room} · Depth ${f.depth}`, { fontFamily: FONT_H, fontSize: '15px', color: HEX.red, fontStyle: '700' }).setOrigin(0.5);
+    }
 
     // the chronicle of this Vigil
     panel(this, 60, 140, 700, 470, { r: 16 });
@@ -75,9 +81,19 @@ export default class RunEndScene extends Phaser.Scene {
     const e = this.add.text(1005, 560, '+0 EMBERS', { fontFamily: FONT_H, fontSize: '34px', color: HEX.amberHot, fontStyle: '900' }).setOrigin(0.5).setAlpha(0);
     this.tweens.add({ targets: e, alpha: 1, duration: 300, delay: 1700 });
     this.tweens.addCounter({ from: 0, to: total, duration: 1200, delay: 1800, onUpdate: (tw) => e.setText(`+${Math.round(tw.getValue())} EMBERS`), onComplete: () => { sfx.loot('relic'); this.cameras.main.shake(150, 0.004); } });
-    makeButton(this, W / 2, H - 56, 300, 58, 'Return to Camp', () => {
+    makeButton(this, W / 2 - 170, H - 56, 300, 58, 'Return to Camp', () => {
       this.cameras.main.fadeOut(600, 5, 11, 12);
       this.time.delayedCall(620, () => this.scene.start('camp', {}));
     }, { size: 18, fill: 0x2a1c0c, stroke: C.amber, sub: `${meta.embers} Embers to spend` });
+    // straight back in, the Slay the Spire way
+    makeButton(this, W / 2 + 170, H - 56, 300, 58, 'Descend Again', () => {
+      sfx.bell();
+      meta.runs++; saveMeta(meta);
+      const next = createRun(meta, Date.now());
+      next.meta = { ...meta.upgrades };
+      this.registry.set('run', next);
+      this.cameras.main.fadeOut(600, 5, 11, 12);
+      this.time.delayedCall(620, () => this.scene.start('map'));
+    }, { size: 18, sub: 'a new Vigil, right now' });
   }
 }

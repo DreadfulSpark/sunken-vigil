@@ -64,6 +64,12 @@ export default class BattleScene extends Phaser.Scene {
     await this.banner(this.s.roomName, boss ? 'The Bishop awaits' : this.mode === 'tutorial' ? 'A first lesson' : `Depth ${this.run.depth}`);
     if (this.tut) await this.tut.start();
     // awakened Resonances are announced as the fight opens
+    if (!this.tut && R.activeResonances(this.run).length) this.firstTime('resonance', 'RESONANCE awakened: your party carries 2+ items of one theme, so every hero gets its bonus. Spoils cards show which theme each item feeds.');
+    const champ = this.s.units.find((u) => u.affix);
+    if (champ && !this.tut) {
+      this.log(`${champ.name}: ${R.AFFIXES[champ.affix].text}`, HEX.red);
+      this.firstTime('affix', `${champ.name.toUpperCase()}: elites (and some deep foes) carry an affix that changes how they fight. Point at them to read it.`);
+    }
     if (!this.tut) for (const r of R.activeResonances(this.run)) {
       this.log(`◆ ${r.name} ${r.level === 2 ? 'II' : 'I'}: ${r.tiers.map((t) => t.text).join(' ')}`, r.hex);
     }
@@ -103,6 +109,37 @@ export default class BattleScene extends Phaser.Scene {
     this.logLines.unshift({ text, color });
     this.logLines = this.logLines.slice(0, 7);
     this.drawLog();
+  }
+  // One-time GUIDE tips: each mechanic is explained the first time it matters, then never again.
+  firstTime(key, text) {
+    if (this.tut) return;
+    const meta = this.registry.get('meta');
+    if (!meta) return;
+    meta.tipsSeen = meta.tipsSeen ?? [];
+    if (meta.tipsSeen.includes(key)) return;
+    meta.tipsSeen.push(key);
+    saveMeta(meta);
+    (this.tipQueue ??= []).push(text);
+    if (!this.tipShowing) this.nextTip();
+  }
+  nextTip() {
+    const text = this.tipQueue?.shift();
+    if (!text) { this.tipShowing = false; return; }
+    this.tipShowing = true;
+    const w = 470;
+    const c = this.add.container(BX + BW / 2, BY + 14).setDepth(72).setAlpha(0);
+    const body = this.add.text(-w / 2 + 70, 10, text, { fontFamily: FONT_B, fontSize: '15px', color: HEX.bone, wordWrap: { width: w - 86 }, lineSpacing: 1 });
+    const h = body.height + 20;
+    const bg = this.add.graphics();
+    bg.fillStyle(0x050b0c, 0.94); bg.fillRect(-w / 2, 0, w, h);
+    bg.lineStyle(2, C.amber, 0.9); bg.strokeRect(-w / 2, 0, w, h);
+    bg.fillStyle(C.amber, 1); bg.fillRect(-w / 2, 0, 60, h);
+    const tag = this.add.text(-w / 2 + 30, h / 2, 'GUIDE', { fontFamily: FONT_H, fontSize: '12px', color: '#050b0c', fontStyle: '900' }).setOrigin(0.5).setAngle(-90);
+    c.add([bg, tag, body]);
+    sfx.page();
+    this.tweens.add({ targets: c, alpha: 1, y: BY + 8, duration: 260, ease: 'Quad.Out' });
+    const hold = 3200 + text.length * 38;
+    this.tweens.add({ targets: c, alpha: 0, delay: hold, duration: 400, onComplete: () => { c.destroy(); this.nextTip(); } });
   }
   caption(text, color = HEX.bone) {
     this.captionText?.destroy();
@@ -203,6 +240,8 @@ export default class BattleScene extends Phaser.Scene {
     }).setDepth(34);
     this.highlight = this.add.graphics().setDepth(35);
     this.hoverG = this.add.graphics().setDepth(36);
+    this.hoverTag = this.add.text(0, 0, '', { fontFamily: FONT_H, fontSize: '13px', color: HEX.bone, fontStyle: '700', align: 'center',
+      backgroundColor: '#050b0cdd', padding: { x: 7, y: 4 }, stroke: '#050b0c', strokeThickness: 2 }).setOrigin(0.5, 1).setDepth(75).setVisible(false);
     this.intentG = this.add.graphics().setDepth(37);
     this.intentLayer = this.add.container(0, 0).setDepth(42);
   }
@@ -400,6 +439,7 @@ export default class BattleScene extends Phaser.Scene {
       if (u.guardBuff) b.push('+2 GUARD');
       if (u.ward > 0) b.push(`WARD ${u.ward}`);
       if (u.snared) b.push('SNARED');
+      if (u.prone) b.push('PRONE');
       if (u.taunting) b.push('TAUNTING');
       if (u.resolve) b.push('RESOLUTE');
       if (u.virtue) b.push(VIRTUES[u.virtue].name.toUpperCase());
@@ -508,6 +548,30 @@ export default class BattleScene extends Phaser.Scene {
       const bg = this.add.circle(bx, by, 13, danger ? 0x5a1010 : 0x1b2a2a, 1).setStrokeStyle(2, danger ? (e.heavy ? 0xffd27a : 0xd0402c) : C.amber);
       const ic = this.add.image(bx, by, INTENT_TEX[plan.type] ?? 'in_move').setScale(0.55);
       this.intentLayer.add([bg, ic]);
+      const TIPS = {
+        lamp: 'A Lamp-Cultist has marked the orange squares. Its burning lamp lands there on its turn: step out, or roll a DEX save to halve it.',
+        charge: 'The Tide-Knight will CHARGE down the red lane. Step out of the line, or put a wall behind someone and they will be slammed.',
+        wave: 'THE TIDE SERMON: a wave will sweep the teal lane and shove everyone in it. Get out, or brace with a perfect reaction.',
+        dive: 'FROM THE DEEP: the Bishop will surface on the ringed tile beside whoever stands alone. Close ranks.',
+        dirge: 'A Choir Wretch will sing a Dirge: Dread to every hero it can see. Break its line of sight.',
+      };
+      if (TIPS[plan.type]) this.firstTime(`intent_${plan.type}`, TIPS[plan.type]);
+      const dmg = this.intentDamage(e, plan);
+      if (dmg) this.intentLayer.add(this.add.text(bx, by + 19, dmg, { fontFamily: FONT_H, fontSize: '11px', color: '#ffb4a4', fontStyle: '900', stroke: '#050b0c', strokeThickness: 4 }).setOrigin(0.5));
+    }
+  }
+  intentDamage(e, plan) {
+    const r = (spec, extra = 0) => { const v = R.diceRange(spec, extra); return v ? `${v[0]}–${v[1]}` : ''; };
+    switch (plan.type) {
+      case 'attack': case 'shoot': case 'cleave': return r(e.dmg);
+      case 'charge': return r(e.dmg, 2);
+      case 'dive': return r(e.dmg, 3);
+      case 'pull': return r(e.dmg);
+      case 'psalm': return '1–8';
+      case 'lamp': case 'wave': return '1–6';
+      case 'dirge': return '+8 DREAD';
+      case 'litany': return 'DREAD';
+      default: return '';
     }
   }
   dashed(x1, y1, x2, y2, col, a) {
@@ -528,6 +592,13 @@ export default class BattleScene extends Phaser.Scene {
     this.muteIcon = this.add.image(0, 0, musicPlayer.muted ? 'ic_mute' : 'ic_sound').setScale(0.5);
     this.muteBtn.add(this.muteIcon);
     this.helpBtn = makeButton(this, PX + PW - 76, 92, 40, 26, '?', () => this.showControls(), { size: 14 });
+    // game speed: 1x or 2x for every animation (remembered between fights)
+    let fast = false; try { fast = localStorage.getItem('sunken-vigil-speed') === '2'; } catch { /* storage blocked */ }
+    const applySpeed = () => { this.time.timeScale = fast ? 2 : 1; this.tweens.timeScale = fast ? 2 : 1; this.speedBtn?.setLabel(fast ? '2×' : '1×'); };
+    this.speedBtn = makeButton(this, PX + PW - 122, 92, 40, 26, '1×', () => { fast = !fast; try { localStorage.setItem('sunken-vigil-speed', fast ? '2' : '1'); } catch { /* ignore */ } applySpeed(); }, {
+      size: 13, onHover: (o) => this.hint(o ? 'Game speed: 1× or 2× animations.' : ''),
+    });
+    applySpeed();
     this.cards = [];
     const heroes = R.heroUnits(this.s);
     heroes.forEach((u, i) => this.cards.push(this.makeHeroCard(u, PX + 12, 106 + i * 94)));
@@ -544,7 +615,7 @@ export default class BattleScene extends Phaser.Scene {
     y += 40;
     panel(this, PX + 12, y, PW - 24, 86, { fill: 0x081012, r: 10 });
     this.inspectTitle = this.add.text(PX + 26, y + 8, 'Point at anything to study it.', { fontFamily: FONT_H, fontSize: '14px', color: HEX.bone, fontStyle: '700', wordWrap: { width: PW - 56 } });
-    this.inspectBody = this.add.text(PX + 26, y + 28, '', { fontFamily: FONT_B, fontSize: '13px', color: HEX.boneDim, wordWrap: { width: PW - 56 }, lineSpacing: 1 });
+    this.inspectBody = this.add.text(PX + 26, y + 28, '', { fontFamily: FONT_B, fontSize: '13px', color: HEX.boneDim, wordWrap: { width: PW - 56 }, lineSpacing: 1, maxLines: 3 });
     y += 96;
     this.add.text(PX + 18, y, 'THE CHRONICLE', { fontFamily: FONT_H, fontSize: '13px', color: HEX.amber, fontStyle: '700', letterSpacing: 3 });
     this.logY = y + 22;
@@ -600,11 +671,11 @@ export default class BattleScene extends Phaser.Scene {
       card.dr.setFillStyle(u.dread >= 75 ? 0xb7e6dc : C.dread);
       card.drT.setText(`DREAD ${Math.round(u.dread)}`);
       const chip = (on, label) => `${on ? '■' : '□'} ${label}`;
-      card.chips.setText(u.dead ? 'FALLEN' : `${chip(!u.moved, 'MOVE')}  ${chip(!u.acted, 'ACT')}  ${chip(u.reaction, 'REACT')}  · GUARD ${R.guardOf(u)}`);
+      card.chips.setText(u.slain ? 'FALLEN' : u.downed ? `DOWN · DEATH SAVES ${'✓'.repeat(u.ds?.ok ?? 0)}${'✗'.repeat(u.ds?.fail ?? 0)}${u.stable ? ' · STABLE' : ''}` : `${chip(!u.moved, 'MOVE')} ${chip(!u.acted, 'ACT')} ${chip(u.bonus, 'BONUS')} ${chip(u.reaction, 'REACT')} · GUARD ${R.guardOf(u)}`);
       const h = this.run.heroes.find((x) => x.id === u.id);
       const w = h?.weapon ? itemById(h.weapon).name : 'no weapon', ch = h?.charm ? itemById(h.charm).name : 'no charm';
       card.gear.setText(`${w} · ${ch}${h?.talents?.length ? ` · ${h.talents.length} talent${h.talents.length > 1 ? 's' : ''}` : ''}`);
-      card.tag.setText(u.dead ? 'FALLEN' : u.flaw ? FLAWS[u.flaw].name.toUpperCase() : u.resolve ? 'RESOLUTE' : u.virtue ? VIRTUES[u.virtue].name.toUpperCase() : '');
+      card.tag.setText(u.downed && !u.slain ? (u.stable ? 'STABLE' : 'DOWN') : u.dead ? 'FALLEN' : u.flaw ? FLAWS[u.flaw].name.toUpperCase() : u.resolve ? 'RESOLUTE' : u.virtue ? VIRTUES[u.virtue].name.toUpperCase() : '');
       card.tag.setBackgroundColor((u.resolve || u.virtue) && !u.flaw ? HEX.amber : HEX.red);
       card.tag.setVisible(!!card.tag.text);
       card.c.setAlpha(u.dead ? 0.45 : 1);
@@ -651,8 +722,10 @@ export default class BattleScene extends Phaser.Scene {
       return;
     }
     const def = ENEMIES[u.kind];
-    const next = this.s.phase === 'party' ? `\n${R.intentText(this.s, u)}` : '';
-    this.inspect(`${u.name}${u.elite ? ' (Elite)' : ''}${u.boss ? ' (Boss)' : ''} · HP ${u.hp}/${u.maxHp} · Guard ${R.guardOf(u)}`, `${def.lore}${next}`);
+    // most useful first: what it does next, then its affix, then the lore (the panel fits 3 lines)
+    const next = this.s.phase === 'party' ? `${R.intentText(this.s, u)}\n` : '';
+    const aff = u.affix ? `${R.AFFIXES[u.affix].name.toUpperCase()}: ${R.AFFIXES[u.affix].text}\n` : '';
+    this.inspect(`${u.name}${u.elite ? ' (Elite)' : ''}${u.boss ? ' (Boss)' : ''} · HP ${u.hp}/${u.maxHp} · Guard ${R.guardOf(u)}`, `${next}${aff}${def.lore}`);
   }
   inspectTile(x, y) {
     const ch = R.tileAt(this.s, x, y);
@@ -696,16 +769,17 @@ export default class BattleScene extends Phaser.Scene {
     this.actionButtons = [];
     const u = this.sel;
     if (!u || u.dead || this.s.phase !== 'party') return;
-    const acts = ['move', ...R.heroActions(this.s, u)];
+    const acts = ['move', ...(u.undo && u.moved && !u.acted ? ['undo'] : []), ...R.heroActions(this.s, u)];
     acts.slice(0, 8).forEach((id, i) => {
-      const sk = id === 'move' ? { name: 'Move', desc: `Walk up to ${u.move} tiles. Shallow water and climbing cost 2.` } : SKILLS[id];
+      const sk = id === 'undo' ? { name: 'Undo Move', desc: 'Take the move back (Z). Only until this hero acts.' } : id === 'move' ? { name: 'Move', desc: `Walk up to ${R.moveOf(u)} tiles${u.prone ? ' (Prone: standing up costs half your movement)' : ''}. Shallow water and climbing cost 2.` } : SKILLS[id];
       const x = BX + 42 + i * 72, y = BY + BH + 46;
       const cdLeft = id !== 'move' && sk.cd ? R.cooldownOf(u, id) : 0;
-      const enabled = id === 'move' ? !u.moved : !u.acted && (id === 'item' || R.skillTargets(this.s, u, id).length > 0);
+      const enabled = id === 'undo' ? true : id === 'move' ? !u.moved : (!u.acted || (sk.bonus && u.bonus)) && (id === 'item' || R.skillTargets(this.s, u, id).length > 0);
       const b = makeSlot(this, x, y, 66, 58, () => this.chooseAction(id), {
-        icon: `ic_${id === 'move' ? 'move' : sk.icon}`, label: sk.name, accent: sk.cd ? C.amber : 0x8a6d44,
+        icon: `ic_${id === 'move' ? 'move' : id === 'undo' ? 'undo' : sk.icon}`, label: sk.name, accent: sk.cd ? C.amber : 0x8a6d44,
         onHover: (o) => this.hint(o ? `${sk.name}: ${sk.desc}${cdLeft ? (cdLeft >= 99 ? '  (Used this fight.)' : `  (Ready in ${cdLeft} round${cdLeft > 1 ? 's' : ''}.)`) : ''}` : ''),
       });
+      if (sk.bonus && enabled && u.acted) this.firstTime('bonus', 'BONUS ACTIONS: Use Item, Kindle, Throw Lantern and Open Chest are bonus actions. Each hero gets one per phase on top of their action.');
       if (sk.cd) {
         // signature abilities: a gem set into the top of the frame, and a countdown while they recharge
         const gem = this.add.graphics();
@@ -714,7 +788,7 @@ export default class BattleScene extends Phaser.Scene {
         if (!cdLeft) { gem.fillStyle(0xffffff, 0.7); gem.fillRect(-2, -31, 2, 2); }
         b.add(gem);
         if (cdLeft) b.add(this.add.text(0, -8, cdLeft >= 99 ? 'USED' : String(cdLeft), { fontFamily: FONT_H, fontSize: cdLeft >= 99 ? '13px' : '22px', color: HEX.bone, fontStyle: '900', stroke: '#050b0c', strokeThickness: 5 }).setOrigin(0.5));
-        else { const glint = this.add.image(0, -28, 'glow').setScale(0.12).setTint(C.amberHot).setBlendMode('ADD'); b.addAt(glint, b.list.indexOf(gem)); this.tweens.add({ targets: glint, alpha: 0.2, scale: 0.18, duration: 800, yoyo: true, repeat: -1, ease: 'Sine.InOut' }); }
+        else { this.firstTime('signature', 'SIGNATURE ABILITY (gold gem): each hero has one powerful move on a cooldown. It recharges between uses; the button shows the rounds left.'); const glint = this.add.image(0, -28, 'glow').setScale(0.12).setTint(C.amberHot).setBlendMode('ADD'); b.addAt(glint, b.list.indexOf(gem)); this.tweens.add({ targets: glint, alpha: 0.2, scale: 0.18, duration: 800, yoyo: true, repeat: -1, ease: 'Sine.InOut' }); }
       }
       b.setEnabled(enabled && (!this.tut || this.tut.isFree() || id === 'move' ? true : this.tut.allowSkill(id)));
       if (this.ui === 'move' && id === 'move') b.setOn(true);
@@ -746,6 +820,7 @@ export default class BattleScene extends Phaser.Scene {
     kb.on('keydown-TWO', () => this.selectIndex(1));
     kb.on('keydown-THREE', () => this.selectIndex(2));
     kb.on('keydown-M', () => this.toggleMute());
+    kb.on('keydown-Z', () => { if (this.sel) this.undoMove(this.sel); });
     kb.on('keydown-FORWARD_SLASH', () => this.showControls());
   }
   selectIndex(i) { const u = R.heroUnits(this.s)[i]; if (u && !u.dead) this.trySelect(u); }
@@ -779,10 +854,11 @@ export default class BattleScene extends Phaser.Scene {
   chooseAction(id) {
     if (!this.canInteract() || !this.sel) return;
     const u = this.sel;
+    if (id === 'undo') { this.undoMove(u); return; }
     if (id === 'move') { if (u.moved) return; this.ui = 'move'; this.skill = null; }
     else if (id === 'item') { this.flashSatchel(); return; }
     else {
-      if (u.acted) return;
+      if (u.acted && !(SKILLS[id]?.bonus && u.bonus)) return;
       if (this.tut && !this.tut.allowSkill(id)) { sfx.denied(); return; }
       const sk = SKILLS[id];
       if (sk.cd && R.cooldownOf(u, id) > 0) { sfx.denied(); return; }
@@ -801,7 +877,7 @@ export default class BattleScene extends Phaser.Scene {
     if (!this.canInteract()) return;
     const u = this.sel;
     if (!u || u.dead) { this.hint('Select a hero first: they will use the item.'); sfx.denied(); return; }
-    if (u.acted) { this.hint(`${this.hname(u)} has already acted this phase.`); sfx.denied(); return; }
+    if (u.acted && !u.bonus) { this.hint(`${this.hname(u)} has used their action and bonus action this phase.`); sfx.denied(); return; }
     if (this.tut && !this.tut.isFree()) { sfx.denied(); return; }
     const it = itemById(this.run.consumables[index]);
     this.pendingItem = { index, it };
@@ -855,6 +931,7 @@ export default class BattleScene extends Phaser.Scene {
   }
   onHover(p) {
     this.hoverG.clear();
+    this.hoverTag?.setVisible(false);
     const x = Math.floor((p.x - BX) / T), y = Math.floor((p.y - BY) / T);
     if (p.x < BX || p.y < BY || x < 0 || y < 0 || x >= this.s.w || y >= this.s.h) return;
     const s = this.s;
@@ -882,9 +959,28 @@ export default class BattleScene extends Phaser.Scene {
       if (sk.kind === 'throw') { this.hoverG.lineStyle(2, C.amberHot, 0.5); this.hoverG.strokeCircle(this.tx(x), this.ty(y), (R.lanternRadius(s) + 0.4) * T); }
       if (unit?.side === 'enemy' && (sk.kind === 'attack' || sk.kind === 'shove')) {
         const am = R.attackMode(s, u, unit, sk.ranged);
-        const pct = Math.round(R.hitChance(R.attackBonus(s, u, unit), R.guardOf(unit), am.mode, u.critOn) * 100);
-        const why = [...am.adv.map((a) => `+${a}`), ...am.dis.map((d) => `−${d}`)].join(', ');
+        const pct = Math.round(R.hitChance(R.attackBonus(s, u, unit), R.guardOf(unit) + (am.cover ?? 0), am.mode, u.critOn) * 100);
+        const why = [...am.adv.map((a) => `+${a}`), ...am.dis.map((d) => `−${d}`), ...(am.cover ? ['half cover: DC +2'] : [])].join(', ');
         this.hint(`${sk.name}: ${pct}% to hit${am.mode > 0 ? ' (Advantage)' : am.mode < 0 ? ' (Disadvantage)' : ''}${why ? ` · ${why}` : ''}`);
+        // a tag right on the target: hit chance, damage, whether it can kill, and where a shove lands
+        const rng = sk.dmg ? R.diceRange(sk.dmg, this.dmgBonusVs(u, unit)) : null;
+        const kill = rng ? (rng[0] >= unit.hp ? '  ·  KILL' : rng[1] >= unit.hp ? '  ·  CAN KILL' : '') : '';
+        if (am.adv.includes('Flanking')) this.firstTime('flank', 'FLANKING: with an ally directly across a foe, melee attacks have Advantage. Foes flank you too.');
+        if (am.cover) this.firstTime('cover', 'HALF COVER: a pillar, brazier or body just in front of the target adds +2 to the roll needed to hit it with a ranged attack.');
+        const flags = [am.adv.includes('Flanking') && 'FLANK', am.cover && 'COVER', unit.prone && 'PRONE', am.mode > 0 && 'ADV', am.mode < 0 && 'DIS'].filter(Boolean).join(' ');
+        let line2 = '';
+        const dist = sk.kind === 'shove' ? sk.push + R.shoveBonus(u) : sk.knock ?? 0;
+        if (dist) {
+          const pp = R.shovePath(s, u, unit, dist);
+          let px = this.tx(unit.x), py = this.ty(unit.y);
+          this.hoverG.lineStyle(3, 0xffd27a, 0.7);
+          for (const st of pp.path) { const nx = this.tx(st.x), ny = this.ty(st.y); this.hoverG.lineBetween(px, py, nx, ny); px = nx; py = ny; }
+          this.hoverG.lineStyle(2, 0xffd27a, 0.9); this.hoverG.strokeCircle(px, py, 12);
+          line2 = pp.result === 'wall' ? 'SLAM + PRONE' : pp.result === 'unit' ? 'CRASH + PRONE' : pp.result === 'water' ? (unit.elite || unit.boss || unit.swims ? 'INTO DEEP WATER' : 'DROWNS') : `pushed ${pp.path.length}`;
+        }
+        this.hoverTag.setText(`${pct}%${rng ? `  ·  ${rng[0]}–${rng[1]}` : ''}${kill}${flags ? `\n${flags}` : ''}${line2 ? `\n${line2}` : ''}`)
+          .setColor(kill.includes('KILL') ? '#ffd27a' : HEX.bone)
+          .setPosition(Phaser.Math.Clamp(this.tx(x), BX + 70, BX + BW - 70), Math.max(BY + 60, this.ty(y) - 34)).setVisible(true);
       }
     }
     if (this.ui === 'target' && this.skill === '__item' && this.pendingItem?.it.use === 'oil') {
@@ -935,12 +1031,14 @@ export default class BattleScene extends Phaser.Scene {
     s.phase = 'party';
     for (const u of R.heroUnits(s)) {
       if (u.dead) continue;
-      u.moved = false; u.acted = false; u.reaction = true; u.braced = false; u.taunting = false;
+      u.undo = null; u.moved = false; u.acted = false; u.bonus = true; u.reaction = true; u.braced = false; u.taunting = false; u.oaUsed = false;
       for (const k of Object.keys(u.cd ?? {})) if (u.cd[k] > 0 && u.cd[k] < 99) u.cd[k]--;
       if (u.mods.regen && u.hp < u.maxHp) { u.hp = Math.min(u.maxHp, u.hp + u.mods.regen); floatText(this, this.tx(u.x), this.ty(u.y) - 20, `+${u.mods.regen}`, '#8fdf93', { size: 18 }); }
     }
     for (const e of R.alive(s, 'enemy')) if (e.guardBuff) e.guardBuff = 0;
     R.lockAims(s);
+    await this.deathSaves();
+    if (this.over) return;
     await this.tickBurning('hero');
     sfx.phase();
     await this.banner(`Round ${s.round}`, 'Party Phase');
@@ -988,15 +1086,40 @@ export default class BattleScene extends Phaser.Scene {
   async moveHero(u, path) {
     this.busy = true;
     this.highlight.clear(); this.hoverG.clear(); this.intentG.clear(); this.intentLayer.removeAll(true);
+    const before = { x: u.x, y: u.y, prone: u.prone, inDeep: u.inDeep, lantern: { ...this.s.lantern }, seen: this.seen.size };
     await this.walk(u, path);
     u.moved = true;
+    // a move can be taken back until the hero acts, unless it revealed a hidden foe or picked up the lantern
+    u.undo = this.seen.size === before.seen && this.s.lantern.carrier === before.lantern.carrier ? before : null;
+    if (u.undo) this.firstTime('undo', 'Misclicked? UNDO MOVE (or Z) takes a move back until that hero acts, unless it revealed a hidden foe.');
     this.busy = false;
     this.tut?.event(`move:${u.id}`);
     this.afterHeroAction(u);
   }
+  undoMove(u) {
+    const b = u.undo;
+    if (!b || u.acted || !u.moved || !this.canInteract()) return;
+    u.x = b.x; u.y = b.y; u.prone = b.prone; u.inDeep = b.inDeep; this.s.lantern = b.lantern;
+    u.moved = false; u.undo = null;
+    const t = this.tokens.get(u.id);
+    this.tweens.add({ targets: t.c, x: this.tx(u.x), y: this.ty(u.y), duration: 160, ease: 'Quad.Out' });
+    if (u.prone) t.glyph.setAngle((t.glyph.flipX ? -1 : 1) * 70);
+    sfx.page();
+    this.refreshLight(); this.refreshVisibility(); this.refreshAll();
+    this.ui = 'move'; this.buildActionBar(); this.drawHighlights();
+  }
   async walk(u, path) {
     const t = this.tokens.get(u.id);
+    if (u.side === 'hero' && u.prone && path.length) { this.standUp(u); floatText(this, t.c.x, t.c.y - 40, 'STANDS UP', HEX.boneDim, { size: 13 }); }
     for (const st of path) {
+      if (u.side === 'enemy' && !this.s.tutorial) {
+        for (const h of R.alive(this.s, 'hero')) {
+          if (u.dead || this.over) return;
+          if (h.oaUsed || h.dazed > 0 || R.cheb(h, u) > 1 || R.cheb(h, st) <= 1) continue;
+          await this.opportunityAttack(h, u);
+        }
+        if (u.dead || this.over) return;
+      }
       const ch = R.tileAt(this.s, st.x, st.y);
       u.x = st.x; u.y = st.y;
       if (u.side === 'hero') {
@@ -1017,10 +1140,12 @@ export default class BattleScene extends Phaser.Scene {
     }
   }
   async doSkill(u, id, tg) {
-    if (u.acted) return;
     const sk = SKILLS[id];
+    const useBonus = sk.bonus && u.bonus;
+    if (u.acted && !useBonus) return;
     this.busy = true;
-    u.acted = true;
+    u.undo = null;
+    if (useBonus) u.bonus = false; else u.acted = true;
     this.highlight.clear(); this.hoverG.clear(); this.intentG.clear(); this.intentLayer.removeAll(true);
     this.tweens.killTweensOf(this.highlight); this.highlight.setAlpha(1);
     this.hint('');
@@ -1040,6 +1165,7 @@ export default class BattleScene extends Phaser.Scene {
         case 'stand': await this.floodgateStand(u, sk); break;
         case 'chain': await this.chainOfNames(u, target, sk); break;
         case 'hour': await this.ninthHour(u, target); break;
+        case 'help': await this.helpUp(u, target); break;
         default: break;
       }
     } catch (err) { console.error(err); }
@@ -1098,7 +1224,7 @@ export default class BattleScene extends Phaser.Scene {
     await this.windUp(u, e);
     const am = R.attackMode(this.s, u, e, sk.ranged);
     u.attackedYet = true;
-    const res = await this.roll({ label: `${this.hname(u)} · ${sk.name}`, bonus: R.attackBonus(this.s, u, e), dc: R.guardOf(e), mode: am.mode, reasons: am, roller: u, allowPush: true, fate: 'hero', critOn: u.critOn, autoCrit: u.resolve });
+    const res = await this.roll({ label: `${this.hname(u)} · ${sk.name}`, bonus: R.attackBonus(this.s, u, e), dc: R.guardOf(e) + (am.cover ?? 0), mode: am.mode, reasons: am, roller: u, allowPush: true, fate: 'hero', critOn: u.critOn, autoCrit: u.resolve });
     if (u.resolve) u.resolve = false;
     if (sk.ranged) { await this.settle(u); await this.projectile(u, e, u.id === 'scholar' ? C.dread : C.amber); }
     if (!res.hit) {
@@ -1130,7 +1256,7 @@ export default class BattleScene extends Phaser.Scene {
     await this.windUp(u, e);
     const am = R.attackMode(this.s, u, e, false);
     u.attackedYet = true;
-    const res = await this.roll({ label: `${this.hname(u)} · ${sk.name}`, bonus: R.attackBonus(this.s, u, e), dc: R.guardOf(e), mode: am.mode, reasons: am, roller: u, allowPush: true, fate: 'hero', critOn: u.critOn, autoCrit: u.resolve });
+    const res = await this.roll({ label: `${this.hname(u)} · ${sk.name}`, bonus: R.attackBonus(this.s, u, e), dc: R.guardOf(e) + (am.cover ?? 0), mode: am.mode, reasons: am, roller: u, allowPush: true, fate: 'hero', critOn: u.critOn, autoCrit: u.resolve });
     if (u.resolve) u.resolve = false;
     if (!res.hit) { await this.settle(u); this.missFx(e, res.fumble ? 'FUMBLE' : 'RESISTED'); if (res.fumble) { this.run.stats.fumbles++; this.addDread(u, 10); } return; }
     await this.strike(u, e, 22);
@@ -1159,13 +1285,53 @@ export default class BattleScene extends Phaser.Scene {
       this.fx.dust.explode(14, t.c.x, t.c.y);
       floatText(this, this.tx(e.x), this.ty(e.y) - 30, 'SLAM', HEX.amber, { size: 18 });
       await this.damage(e, R.die(this.rng, 4) + 1 + slamBonus, { quiet: true, by });
+      if (!e.dead && !e.boss) this.knockProne(e);
     } else if (pp.result === 'unit') {
       sfx.slam(); this.cameras.main.shake(140, 0.006);
       floatText(this, this.tx(e.x), this.ty(e.y) - 30, 'CRASH', HEX.amber, { size: 18 });
       await this.damage(e, R.die(this.rng, 4) + Math.floor(slamBonus / 2), { quiet: true, by });
+      if (!e.dead && !e.boss) this.knockProne(e);
       if (!pp.other.dead) await this.damage(pp.other, R.die(this.rng, 4), { quiet: true });
     } else if (pp.result === 'water' && !e.dead) await this.fallInWater(e, by);
     this.refreshAll();
+  }
+  knockProne(u) {
+    if (u.prone) return;
+    u.prone = true;
+    this.firstTime('prone', 'PRONE: knocked flat by a slam. Melee attacks against them have Advantage, ranged ones Disadvantage, and standing up costs half their movement.');
+    const t = this.tokens.get(u.id);
+    floatText(this, this.tx(u.x), this.ty(u.y) - 52, 'PRONE', HEX.amber, { size: 15, delay: 150 });
+    if (t) this.tweens.add({ targets: [t.glyph, t.flash], angle: (t.glyph.flipX ? -1 : 1) * 70, y: t.glyphY + 10, duration: 220, ease: 'Quad.Out' });
+    this.refreshBars();
+  }
+  standUp(u) {
+    if (!u.prone) return;
+    u.prone = false;
+    const t = this.tokens.get(u.id);
+    if (t) this.tweens.add({ targets: [t.glyph, t.flash], angle: 0, y: t.glyphY, duration: 200, ease: 'Back.Out' });
+    this.refreshBars();
+  }
+  // D&D: opportunity attack. A melee hero takes a free swing at a foe that walks out of their reach,
+  // once per enemy phase. Brannoc's Tide Hammer and Hesk's Knell can do it; Ysolde's magic cannot.
+  async opportunityAttack(h, e) {
+    const id = h.skills.find((k) => SKILLS[k].kind === 'attack' && !SKILLS[k].ranged);
+    if (!id) return;
+    h.oaUsed = true;
+    this.firstTime('oa', 'OPPORTUNITY ATTACK: a foe that walks out of a melee hero\'s reach gets a free swing from them, once per enemy phase. Stand where they must pass you.');
+    const sk = SKILLS[id];
+    const ht = this.tokens.get(h.id);
+    floatText(this, ht.c.x, ht.c.y - 56, 'OPPORTUNITY ATTACK', HEX.amberHot, { size: 15 });
+    const am = R.attackMode(this.s, h, e, false);
+    const res = await this.roll({ label: `${this.hname(h)} · Opportunity Attack`, bonus: R.attackBonus(this.s, h, e), dc: R.guardOf(e), mode: am.mode, reasons: am, roller: h, critOn: h.critOn });
+    if (!res.hit) { await this.settle(h); this.missFx(e, 'MISS'); return; }
+    await this.strike(h, e, 18, { crit: res.crit });
+    await this.damage(e, R.rollDice(this.rng, sk.dmg, res.crit ? 2 : 1, this.dmgBonusVs(h, e)).total, { crit: res.crit, by: h });
+  }
+  // D&D: saving throw, shown over the hero
+  savingThrowFx(u, stat, dc) {
+    const r = R.savingThrow(this.rng, u, stat, dc);
+    floatText(this, this.tx(u.x), this.ty(u.y) - 62, `${stat} SAVE ${r.total} vs ${dc} · ${r.ok ? 'HALF' : 'FAIL'}`, r.ok ? HEX.amberHot : HEX.red, { size: 14, dur: 1300 });
+    return r;
   }
   async fallInWater(e, by) {
     const t = this.tokens.get(e.id);
@@ -1280,7 +1446,7 @@ export default class BattleScene extends Phaser.Scene {
     await this.windUp(u, e);
     const am = R.attackMode(this.s, u, e, true);
     u.attackedYet = true;
-    const res = await this.roll({ label: `${this.hname(u)} · ${sk.name}`, bonus: R.attackBonus(this.s, u, e), dc: R.guardOf(e), mode: am.mode, reasons: am, roller: u, allowPush: true, fate: 'hero', critOn: u.critOn });
+    const res = await this.roll({ label: `${this.hname(u)} · ${sk.name}`, bonus: R.attackBonus(this.s, u, e), dc: R.guardOf(e) + (am.cover ?? 0), mode: am.mode, reasons: am, roller: u, allowPush: true, fate: 'hero', critOn: u.critOn });
     await this.settle(u);
     const ut = this.tokens.get(u.id);
     floatText(this, ut.c.x, ut.c.y - 54, 'CHAIN OF NAMES', HEX.dread, { size: 17 });
@@ -1376,7 +1542,8 @@ export default class BattleScene extends Phaser.Scene {
   async useItem(u, tg) {
     const { index, it } = this.pendingItem;
     this.pendingItem = null;
-    this.busy = true; u.acted = true;
+    this.busy = true; u.undo = null;
+    if (u.bonus) u.bonus = false; else u.acted = true;
     this.highlight.clear(); this.hoverG.clear();
     this.run.consumables.splice(index, 1);
     const target = tg?.unit;
@@ -1464,6 +1631,7 @@ export default class BattleScene extends Phaser.Scene {
       this.floodShallows();
       R.chronicle(this.run, 'The Bishop flooded his own apse rather than lose it.');
     }
+    if (u.hp <= 0 && u.side === 'hero' && !this.tut) this.run.stats.fellTo = { hero: this.hname(u), by: by?.side === 'enemy' ? by.name : null, source, depth: this.run.depth, room: this.s.roomName };
     if (u.hp <= 0) {
       if (u.side === 'hero' && R.hasRelic(this.run, 'r_hourglass') && !this.s.hourglassUsed) {
         this.s.hourglassUsed = true; u.hp = 1; sfx.resolve();
@@ -1497,14 +1665,84 @@ export default class BattleScene extends Phaser.Scene {
     } else {
       const m = this.add.image(this.tx(u.x), this.ty(u.y), 'fallen').setDepth(3).setAlpha(0);
       this.tweens.add({ targets: m, alpha: 0.95, duration: 600 });
+      // D&D: at 0 HP a hero is DOWN, not dead. They make death saves each round until helped up, stable, or lost.
+      if (!this.tut) {
+        u.downed = true; u.ds = { ok: 0, fail: 0 }; u.fallenImg = m; u.prone = false;
+        this.time.delayedCall(1250, () => { if (u.downed) this.tweens.add({ targets: t.c, alpha: 0.85, duration: 300 }); });
+        floatText(this, t.c.x, t.c.y - 40, 'DOWN · DEATH SAVES', HEX.red, { size: 16, delay: 400, dur: 1600 });
+        this.firstTime?.('downed', `${this.hname(u)} is DOWN, not dead. Each party phase they roll a death save (d20, 10+). Three successes: stable. Three failures: lost. Any adjacent hero can HELP UP.`);
+      }
       this.say('heroDown', { hero: u }, HEX.red, true);
       this.run.stats.falls++;
       R.chronicle(this.run, `${this.hname(u)} fell in ${this.s.roomName}.`);
       R.alive(this.s, 'hero').forEach((h) => { this.addDread(h, 20); this.bark(h, 'allyDown', 0.5); });
       if (this.sel === u) this.sel = null;
+      if (this.s.phase === 'party' && this.sel) this.buildActionBar();
     }
     this.refreshAll();
     await this.wait(300);
+    if (u.side === 'enemy' && u.affix === 'emberborn' && !this.over) await this.emberBurst(u);
+  }
+  async emberBurst(u) {
+    const x = this.tx(u.x), y = this.ty(u.y);
+    sfx.fire(); this.cameras.main.shake(260, 0.01);
+    this.fx.fire.explode(60, x, y);
+    FX.smash(this, x, y, 0xff8a3a, true);
+    floatText(this, x, y - 50, 'EMBER-BORN', HEX.amberHot, { size: 16 });
+    for (const v of R.alive(this.s).filter((o) => R.cheb(o, u) <= 1)) {
+      const save = v.side === 'hero' ? this.savingThrowFx(v, 'DEX', 13) : null;
+      const d = R.die(this.rng, 6);
+      await this.damage(v, save?.ok ? Math.max(1, Math.floor(d / 2)) : d, { quiet: true, source: 'ember-born' });
+      if (!v.dead && !save?.ok) v.burning = Math.max(v.burning, 2);
+    }
+    this.refreshAll();
+  }
+  async deathSaves() {
+    for (const u of R.heroUnits(this.s).filter((h) => h.downed && !h.stable && !h.slain)) {
+      if (this.over) return;
+      const res = await this.roll({ label: `${this.hname(u)} · Death Save`, bonus: 0, dc: 10, dcLabel: 'DC', mode: 0, roller: u, kind: 'save' });
+      const t = this.tokens.get(u.id);
+      if (res.crit) {
+        floatText(this, t.c.x, t.c.y - 50, 'NATURAL 20 · RISES!', HEX.amberHot, { size: 17, dur: 1500 });
+        await this.reviveHero(u, 1);
+        continue;
+      }
+      if (res.hit) u.ds.ok++; else u.ds.fail += res.fumble ? 2 : 1;
+      if (u.ds.ok >= 3) { u.stable = true; sfx.resolve(); floatText(this, t.c.x, t.c.y - 50, 'STABLE', HEX.amberHot, { size: 17 }); this.log(`${this.hname(u)} stops bleeding. Stable, but still down.`, HEX.amberHot); }
+      else if (u.ds.fail >= 3) {
+        u.slain = true; u.deathSave = 'fail'; sfx.defeat();
+        floatText(this, t.c.x, t.c.y - 50, 'LOST', HEX.red, { size: 19, dur: 1600 });
+        this.tweens.add({ targets: t.c, alpha: 0, duration: 800 });
+        this.log(`${this.hname(u)} fails a third death save. The lake keeps them.`, HEX.red);
+        R.alive(this.s, 'hero').forEach((h) => this.addDread(h, 15));
+      } else floatText(this, t.c.x, t.c.y - 50, `${res.hit ? 'SUCCESS' : res.fumble ? 'NATURAL 1 · TWO FAILURES' : 'FAILURE'}  ${'✓'.repeat(u.ds.ok)}${'✗'.repeat(u.ds.fail)}`, res.hit ? HEX.bone : HEX.red, { size: 14, dur: 1400 });
+      this.refreshAll();
+      await this.wait(500);
+    }
+  }
+  async reviveHero(u, hp) {
+    u.dead = false; u.downed = false; u.stable = false; u.ds = null; u.hp = hp;
+    const t = this.tokens.get(u.id);
+    u.fallenImg?.destroy(); u.fallenImg = null;
+    this.tweens.killTweensOf([t.c, t.glyph, t.flash]);
+    t.glyph.clearTint();
+    t.c.setAlpha(1).setPosition(this.tx(u.x), this.ty(u.y));
+    t.glyph.setAngle(0).setY(t.glyphY); t.flash.setAngle(0).setY(t.glyphY).setAlpha(0);
+    this.tweens.add({ targets: t.bar, alpha: 1, duration: 200 });
+    sfx.resolve(); this.fx.gold.explode(30, t.c.x, t.c.y);
+    floatText(this, t.c.x, t.c.y - 30, `+${hp}`, '#8fdf93', { size: 20 });
+    this.knockProne(u);
+    R.alive(this.s, 'hero').forEach((h) => this.addDread(h, -10));
+    this.refreshAll(); this.refreshLight();
+    await this.wait(400);
+  }
+  async helpUp(u, target) {
+    if (!target?.downed) return;
+    const ut = this.tokens.get(u.id);
+    FX.face(ut, this.tx(u.x), this.tx(target.x));
+    await this.tween({ targets: ut.c, x: (this.tx(u.x) * 2 + this.tx(target.x)) / 3, y: (this.ty(u.y) * 2 + this.ty(target.y)) / 3, duration: 160, yoyo: true });
+    this.log(`${this.hname(u)} hauls ${this.hname(target)} out of the water and onto their feet.`, HEX.amberHot);
+    await this.reviveHero(target, 1 + R.die(this.rng, 4));
   }
   async sinkUnit(e) {
     const t = this.tokens.get(e.id);
@@ -1577,6 +1815,7 @@ export default class BattleScene extends Phaser.Scene {
     const s = this.s;
     s.phase = 'enemy';
     this.busy = true;
+    this.hint(''); this.hoverTag?.setVisible(false);
     this.refreshHud(); this.drawIntents();
     sfx.enemyPhase();
     await this.banner(`Round ${s.round}`, 'Enemy Phase', 700);
@@ -1614,11 +1853,18 @@ export default class BattleScene extends Phaser.Scene {
     if (e.kind === 'cultist' && plan.type !== 'lamp' && e.lampCd > 0) e.lampCd--;
     if (e.boss && plan.type !== 'dive' && e.diveCd > 0) e.diveCd--;
     const t = this.tokens.get(e.id);
+    if (e.affix === 'tidebound' && ['~', ','].includes(R.tileAt(this.s, e.x, e.y)) && e.hp < e.maxHp) {
+      const amt = Math.min(4, e.maxHp - e.hp); e.hp += amt;
+      this.fx.brine.explode(14, t.c.x, t.c.y); floatText(this, t.c.x, t.c.y - 30, `+${amt} TIDEBOUND`, '#9fd6cb', { size: 15 });
+      this.refreshBars();
+    }
     if (plan.type === 'sink') { await this.sinkUnit(e); return; }
     if (plan.type === 'dazed') { e.dazed--; floatText(this, t.c.x, t.c.y - 30, 'DAZED', HEX.amber, { size: 18 }); this.refreshBars(); await this.wait(450); return; }
     if (plan.type === 'wait') return;
     if (R.visibleToHeroes(this.s, e)) await this.tween({ targets: t.c, scale: 1.12, duration: 110, yoyo: true });
+    if (e.prone) { this.standUp(e); floatText(this, t.c.x, t.c.y - 40, 'STANDS UP', HEX.boneDim, { size: 13 }); }
     if (plan.path?.length && plan.type !== 'charge') await this.walk(e, plan.path);
+    if (e.dead || this.over) return;
     switch (plan.type) {
       case 'attack':
         if (R.cheb(e, plan.target) <= 1) await this.enemyStrike(e, plan.target, false);
@@ -1644,6 +1890,14 @@ export default class BattleScene extends Phaser.Scene {
       case 'raise': await this.raiseDead(e); break;
       case 'litany': await this.litany(e); break;
       default: break;
+    }
+    if (e.affix === 'choirbound' && !e.dead && !this.over) {
+      const near = R.alive(this.s, 'hero').filter((h) => R.cheb(h, e) <= 2);
+      if (near.length) {
+        sfx.scream(); floatText(this, this.tx(e.x), this.ty(e.y) - 50, 'CHOIRBOUND HYMN', HEX.dread, { size: 14 });
+        for (const h of near) { this.addDread(h, 6); this.fx.dread.explode(8, this.tx(h.x), this.ty(h.y)); }
+        await this.wait(250);
+      }
     }
   }
   // ---------- enemy signatures: each kind telegraphs and lands its blow its own way ----------
@@ -1724,7 +1978,7 @@ export default class BattleScene extends Phaser.Scene {
     if (this.tut) await this.tut.trigger('beforeEnemyAttack');
     await this.enemyWindUp(e, h, ranged);
     const am = R.attackMode(this.s, e, h, ranged);
-    let res = await this.roll({ label: `${e.name} attacks ${this.hname(h)}`, bonus: e.atk, dc: R.guardOf(h), mode: am.mode, reasons: am, roller: e, enemy: true });
+    let res = await this.roll({ label: `${e.name} attacks ${this.hname(h)}`, bonus: e.atk, dc: R.guardOf(h) + (am.cover ?? 0), mode: am.mode, reasons: am, roller: e, enemy: true });
     if (!res.hit) { await this.settle(e); this.resetPose(e); this.missFx(h, res.fumble ? 'FUMBLE' : 'MISS'); return; }
     if (ranged) { await this.settle(e); await this.enemyShot(e, h); }
     else await this.enemyMelee(e, h, res.crit);
@@ -1758,7 +2012,7 @@ export default class BattleScene extends Phaser.Scene {
       const burn = await this.fatePrompt(`This blow will fell ${this.hname(h)}. Burn a Fate to make the ${e.name} reroll its attack?`);
       if (burn) {
         this.run.fate--; this.refreshHud(); sfx.resolve();
-        res = await this.roll({ label: `${e.name} · FATE REROLL`, bonus: e.atk, dc: R.guardOf(h), mode: am.mode, reasons: am, roller: e, enemy: true });
+        res = await this.roll({ label: `${e.name} · FATE REROLL`, bonus: e.atk, dc: R.guardOf(h) + (am.cover ?? 0), mode: am.mode, reasons: am, roller: e, enemy: true });
         if (!res.hit) { this.missFx(h, 'FATE TURNS IT'); this.say('fateTurn', {}, HEX.amberHot, true); return; }
       }
     }
@@ -1796,8 +2050,10 @@ export default class BattleScene extends Phaser.Scene {
     this.refreshLight();
     this.log('The cultist lights its lamp at last, and throws it.', HEX.amberHot);
     for (const v of R.alive(s).filter((u) => R.cheb(u, area) <= 1 && u !== e)) {
-      await this.damage(v, R.die(this.rng, 6), { quiet: true, source: 'lamp-fire' });
-      if (!v.dead) v.burning = Math.max(v.burning, 2);
+      const save = v.side === 'hero' ? this.savingThrowFx(v, 'DEX', 13) : null;
+      const dmg = R.die(this.rng, 6);
+      await this.damage(v, save?.ok ? Math.max(1, Math.floor(dmg / 2)) : dmg, { quiet: true, source: 'lamp-fire' });
+      if (!v.dead && !save?.ok) v.burning = Math.max(v.burning, 2);
     }
     this.refreshAll();
   }
@@ -1854,6 +2110,7 @@ export default class BattleScene extends Phaser.Scene {
       }
       h.burning = 0;
       this.fx.brine.explode(24, this.tx(h.x), this.ty(h.y));
+      if (this.savingThrowFx(h, 'DEX', 13).ok) mult *= 0.5;
       await this.damage(h, Math.max(1, Math.ceil(R.rollDice(this.rng, '1d6').total * mult)), { quiet: true, source: 'the tide', by: e });
       if (!h.dead && shove && !this.over) await this.push(null, h, shove, { dir: aim.dir, by: e });
     }
@@ -1986,7 +2243,7 @@ export default class BattleScene extends Phaser.Scene {
     chain.retract(160);
     if (!this.s.tutorial && !h.dead) { h.snared = true; floatText(this, this.tx(h.x), this.ty(h.y) - 50, 'SNARED', HEX.red, { size: 15 }); }
     if (pp.result === 'water') await this.fallInWater(h, null);
-    await this.damage(h, R.rollDice(this.rng, dmgSpec).total, { quiet: true });
+    await this.damage(h, R.rollDice(this.rng, dmgSpec).total, { quiet: true, by: e });
     this.refreshAll();
   }
   async censerHeal(e, ally) {
@@ -2194,7 +2451,8 @@ export default class BattleScene extends Phaser.Scene {
     const tray = this.tray;
     tray.setVisible(true).setAlpha(0).setScale(0.9);
     this.tweens.add({ targets: tray, alpha: 1, scale: 1, duration: 140, ease: 'Back.Out' });
-    this.trayLabel.setText(reroll ? `${o.label} · FATE REROLL` : o.label);
+    const coverTag = o.reasons?.cover ? ' · HALF COVER (DC +2)' : '';
+    this.trayLabel.setText(reroll ? `${o.label} · FATE REROLL` : o.label + coverTag);
     const tag = res.mode > 0 ? `ADVANTAGE · ${o.reasons?.adv.join(', ')}` : res.mode < 0 ? `DISADVANTAGE · ${o.reasons?.dis.join(', ')}` : o.autoCrit ? 'RESOLUTE · guaranteed critical' : '';
     this.trayTag.setText(tag).setColor(res.mode < 0 ? HEX.red : HEX.amber);
     const two = res.rolls.length === 2;
@@ -2300,6 +2558,8 @@ export default class BattleScene extends Phaser.Scene {
     const run = this.run;
     for (const u of R.heroUnits(this.s).filter((x) => x.dead)) {
       if (this.tut) { u.deathSave = 'pass'; continue; }
+      if (u.slain) { u.deathSave = 'fail'; this.caption(`${this.hname(u)} is lost for the rest of this Vigil.`, HEX.red); await this.wait(1600); continue; }
+      if (u.stable) { u.deathSave = 'pass'; sfx.resolve(); this.caption(`${this.hname(u)} was stabilised, and rises scarred (−2 max HP).`, HEX.amberHot); await this.wait(1600); continue; }
       const h = run.heroes.find((x) => x.id === u.id);
       const dc = R.deathSaveDC(h);
       await this.banner(this.hname(u), 'Death save: will they rise?', 700);

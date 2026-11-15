@@ -191,6 +191,10 @@ export function rollLoot(run, rng, { count = 3, kinds = ['weapon', 'charm', 'rel
   const owned = new Set([...run.relics, ...run.heroes.flatMap((h) => [h.weapon, h.charm])]);
   const lost = new Set(run.heroes.filter((h) => h.lost).map((h) => h.id));
   const pool = ITEMS.filter((it) => kinds.includes(it.slot) && !owned.has(it.id) && !(it.hero && lost.has(it.hero)));
+  // gentle steering: the theme you carry most is twice as likely to turn up (like Slay the Spire's card bias)
+  const counts = tagCounts(run);
+  const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+  const lean = top && top[1] > 0 ? top[0] : null;
   const out = [];
   let guard = 0;
   while (out.length < count && guard++ < 200) {
@@ -206,11 +210,18 @@ export function rollLoot(run, rng, { count = 3, kinds = ['weapon', 'charm', 'rel
     }
     const cands = pool.filter((it) => it.rarity === rarity && !out.includes(it.id));
     const fallback = pool.filter((it) => !out.includes(it.id));
-    const pick = cands.length ? pickOne(rng, cands) : fallback.length ? pickOne(rng, fallback) : null;
+    const pick = cands.length ? leanPick(rng, cands, lean) : fallback.length ? leanPick(rng, fallback, lean) : null;
     if (!pick) break;
     out.push(pick.id);
   }
   return out;
+}
+function leanPick(rng, list, lean) {
+  if (!lean) return pickOne(rng, list);
+  const w = list.map((it) => (it.tag === lean ? 2 : 1));
+  let r = rng() * w.reduce((a, b) => a + b, 0);
+  for (let i = 0; i < list.length; i++) if ((r -= w[i]) < 0) return list[i];
+  return list[list.length - 1];
 }
 export function itemPrice(it) {
   return { worn: 22, blessed: 40, relic: 65, cursed: 46 }[it.rarity] + (it.slot === 'consumable' ? -10 : 0);
@@ -264,8 +275,23 @@ function makeHeroUnit(run, h) {
     critOn: 20 - (m.crit ?? 0), dread: h.dread, flaw,
     moved: false, acted: false, reaction: true, marked: 0, braced: false, resolve: false, virtue: null,
     dead: false, inDeep: false, attackedYet: false, dazed: 0, burning: 0, firstParryDone: false,
-    cd: {}, taunting: false,
+    cd: {}, taunting: false, bonus: true,
   };
+}
+export const AFFIXES = {
+  emberborn: { name: 'Ember-born', text: 'When it dies it bursts into lamp-fire: 1d6 and Burning to everything adjacent (DEX save 13 halves).' },
+  warded: { name: 'Warded', text: 'Starts the fight Warded: the first 10 damage it takes is absorbed.' },
+  tidebound: { name: 'Tidebound', text: 'Heals 4 at the start of each turn it begins in water. Drive it onto dry stone.' },
+  choirbound: { name: 'Choirbound', text: 'Ends each of its turns with a hymn: +6 Dread to every hero within 2.' },
+  swift: { name: 'Swift', text: '+2 Move. It reaches you sooner than you think.' },
+};
+export const AFFIX_IDS = Object.keys(AFFIXES);
+export function applyAffix(e, id) {
+  e.affix = id;
+  e.name = `${AFFIXES[id].name} ${e.name}`;
+  e.silver = Math.round(e.silver * 1.5);
+  if (id === 'warded') e.ward = (e.ward ?? 0) + 10;
+  if (id === 'swift') e.move += 2;
 }
 function makeEnemyUnit(id, kind, x, y, tier) {
   const def = ENEMIES[kind];
@@ -321,6 +347,12 @@ export function createBattle(run, { roomId, enemies, tier = 1, seed = Date.now()
     }
     s.units.push(makeEnemyUnit(`${kind}${i}`, kind, x, y, tier));
   });
+  // Elite affixes: every elite, and sometimes the toughest foe at depth 3, carries a curse of its own
+  if (!tutorial) {
+    const foes = alive(s, 'enemy').filter((e) => !e.boss);
+    const champ = foes.find((e) => e.elite) ?? (tier >= 3 && s.rng() < 0.4 ? [...foes].sort((a, b) => b.maxHp - a.maxHp)[0] : null);
+    if (champ) applyAffix(champ, AFFIX_IDS[Math.floor(s.rng() * AFFIX_IDS.length)]);
+  }
   if (hasRelic(run, 'r_bell')) {
     const strongest = alive(s, 'enemy').sort((a, b) => b.maxHp - a.maxHp)[0];
     if (strongest) strongest.marked = 2;
@@ -371,7 +403,9 @@ export function stepCost(s, u, fx, fy, tx, ty) {
   if (ch === '^' && tileAt(s, fx, fy) !== '^') return 2;
   return 1;
 }
-export function reachable(s, u, budget = u.move) {
+// D&D: standing up from Prone costs half your movement
+export const moveOf = (u) => (u.prone ? Math.ceil(u.move / 2) : u.move);
+export function reachable(s, u, budget = moveOf(u)) {
   const dist = new Map();
   const prev = new Map();
   const start = key(s, u.x, u.y);
@@ -402,9 +436,11 @@ export function reachable(s, u, budget = u.move) {
   }
   return { dist, prev, start };
 }
+export const downedAt = (s, x, y) => s.units.find((u) => u.downed && !u.slain && u.x === x && u.y === y);
 export function canStop(s, u, x, y) {
   const other = unitAt(s, x, y);
   if (other && other !== u) return false;
+  if (downedAt(s, x, y)) return false;
   if (u.flaw === 'paranoid') {
     if (alive(s, 'hero').some((h) => h !== u && Math.max(Math.abs(h.x - x), Math.abs(h.y - y)) <= 1)) return false;
   }
@@ -490,8 +526,32 @@ export function attackMode(s, attacker, target, ranged = false) {
   }
   if (attacker.flaw === 'hopeless') dis.push('Hopeless');
   if (attacker.inDeep) dis.push('Floundering');
+  // D&D: flanking. An ally directly across the target gives melee Advantage (both sides use it).
+  if (!ranged && flanker(s, attacker, target)) adv.push('Flanking');
+  // D&D: Prone. Easy to hit up close, hard to hit from afar.
+  if (target.prone) (ranged ? dis : adv).push(ranged ? 'Prone (at range)' : 'Prone');
   const mode = Math.sign(adv.length) - Math.sign(dis.length);
-  return { mode, adv, dis };
+  return { mode, adv, dis, cover: ranged ? coverBonus(s, attacker, target) : 0 };
+}
+export function flanker(s, a, t) {
+  if (cheb(a, t) > 1) return null;
+  const x = 2 * t.x - a.x, y = 2 * t.y - a.y;
+  const o = unitAt(s, x, y);
+  return o && o !== a && !o.dead && o.side === a.side && !(o.dazed > 0) ? o : null;
+}
+// D&D: half cover. A pillar, brazier, statue or body on the target's side of the line adds +2 to the DC.
+export function coverBonus(s, a, t) {
+  if (cheb(a, t) <= 1) return 0;
+  const cx = t.x - Math.sign(t.x - a.x), cy = t.y - Math.sign(t.y - a.y);
+  if (cx === a.x && cy === a.y) return 0;
+  const o = unitAt(s, cx, cy);
+  return isSolid(tileAt(s, cx, cy)) || (o && !o.dead) ? 2 : 0;
+}
+// D&D: a saving throw. d20 + ability modifier against a DC.
+export function savingThrow(rng, u, stat, dc) {
+  const d = 1 + Math.floor(rng() * 20);
+  const mod = u.stats?.[stat] ?? 0;
+  return { d, mod, total: d + mod, ok: d === 20 || (d !== 1 && d + mod >= dc) };
 }
 export function attackBonus(s, u, target) {
   let b = u.atk;
@@ -513,14 +573,23 @@ export function heroActions(s, u) {
   if (s.braziers.some((b) => !b.lit && cheb(b, u) <= 1)) list.push('kindle');
   if (s.chests.some((c) => !c.open && cheb(c, u) <= 1)) list.push('open');
   if (s.run.consumables.length) list.push('item');
+  if (s.units.some((o) => o.downed && !o.slain && cheb(o, u) <= 1)) list.unshift('help');
   return list;
 }
 export const cooldownOf = (u, skillId) => (u.cd?.[skillId] ?? 0);
+// "1d10+4" -> [5, 14], plus any flat extra
+export function diceRange(spec, extra = 0) {
+  const m = /(\d+)d(\d+)([+-]\d+)?/.exec(spec ?? '');
+  if (!m) return null;
+  const n = +m[1], d = +m[2], k = +(m[3] ?? 0) + extra;
+  return [n + k, n * d + k];
+}
 export function skillTargets(s, u, skillId) {
   const sk = SKILLS[skillId];
   if (sk.cd && cooldownOf(u, skillId) > 0) return [];
   if (sk.kind === 'self' || sk.kind === 'toll' || sk.kind === 'chime' || sk.kind === 'stand') return [{ x: u.x, y: u.y }];
   if (sk.kind === 'hour') return alive(s, 'hero').filter((h) => h !== u && cheb(h, u) <= sk.range && (h.acted || h.moved)).map((h) => ({ x: h.x, y: h.y, unit: h }));
+  if (sk.kind === 'help') return s.units.filter((o) => o.downed && !o.slain && cheb(o, u) <= 1).map((o) => ({ x: o.x, y: o.y, unit: o }));
   if (sk.kind === 'kindle') return s.braziers.filter((b) => !b.lit && cheb(b, u) <= 1).map((b) => ({ x: b.x, y: b.y }));
   if (sk.kind === 'open') return s.chests.filter((c) => !c.open && cheb(c, u) <= 1).map((c) => ({ x: c.x, y: c.y }));
   if (sk.kind === 'throw') return throwTiles(s, u, sk.range);
@@ -549,6 +618,7 @@ export function pushPath(s, target, dx, dy, dist) {
     if (!inBounds(s, nx, ny) || isSolid(ch)) return { path, result: 'wall' };
     const other = unitAt(s, nx, ny);
     if (other) return { path, result: 'unit', other };
+    if (downedAt(s, nx, ny)) return { path, result: 'clear' };
     path.push({ x: nx, y: ny });
     x = nx; y = ny;
     if (ch === '~' && intoDeep) return { path, result: 'water' };
@@ -566,7 +636,7 @@ export function pullPath(s, puller, target, dist) {
     const nx = x + dx, ny = y + dy;
     if (nx === puller.x && ny === puller.y) break;
     const ch = tileAt(s, nx, ny);
-    if (isSolid(ch) || unitAt(s, nx, ny)) break;
+    if (isSolid(ch) || unitAt(s, nx, ny) || downedAt(s, nx, ny)) break;
     path.push({ x: nx, y: ny });
     x = nx; y = ny;
     if (ch === '~' && !target.swims) return { path, result: 'water' };
@@ -611,7 +681,7 @@ function walkToward(s, e, target) {
   let spent = 0, px = e.x, py = e.y, cut = 0;
   for (let i = 0; i < full.length; i++) {
     spent += stepCost(s, e, px, py, full[i].x, full[i].y);
-    if (spent > e.move) break;
+    if (spent > moveOf(e)) break;
     px = full[i].x; py = full[i].y;
     if (canStop(s, e, px, py)) cut = i + 1;
   }
@@ -819,11 +889,11 @@ export function intentText(s, e) {
       if (!s.tutorial && e.kind === 'snuffer' && s.lantern.carrier === p.target.id) rider = ' · knocks the lantern loose';
       return `Next: attacks ${who} · ${e.dmg}${e.heavy ? ' · HEAVY' : ''}${rider}`;
     }
-    case 'lamp': return 'Next: hurls its burning lamp at the marked area · 1d6 fire, sets alight';
+    case 'lamp': return 'Next: hurls its burning lamp at the marked area · 1d6 fire, sets alight · DEX save 13 halves it';
     case 'charge': return `Next: CHARGES ${who} in a line · ${e.dmg} +2 damage · shoves 2 · step out of the line`;
     case 'dirge': return `Next: sings a Dirge · +8 Dread to every hero it can see (${p.targets.length})`;
     case 'ward': return `Next: wards the ${p.ally.name} · absorbs the next 6 damage`;
-    case 'wave': return `Next: THE TIDE SERMON · a wave sweeps the marked ${p.area.axis === 'row' ? 'rows' : 'columns'} · 1d6, shoves 2 · get out of the lane (${p.targets.length} caught)`;
+    case 'wave': return `Next: THE TIDE SERMON · a wave sweeps the marked ${p.area.axis === 'row' ? 'rows' : 'columns'} · 1d6 (DEX save 13 halves), shoves 2 · get out of the lane (${p.targets.length} caught)`;
     case 'dive': return `Next: FROM THE DEEP · sinks and surfaces beside ${who} · HEAVY ${e.dmg}, +3 damage · Snares · ends his turn · he hunts whoever stands alone`;
     case 'shoot': return `Next: shoots ${who} · ${e.dmg}${e.dreadOnHit ? ` · +${e.dreadOnHit} Dread` : ''}`;
     case 'pull': return `Next: hooks ${who}, drags them ${e.pulls} tiles and Snares them (foes get Advantage)`;

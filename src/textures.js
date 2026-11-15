@@ -160,6 +160,8 @@ export function makeTextures(scene) {
   icon('lantern', () => { g.fillStyle(0x6b5a45, 1); g.fillRect(13, 10, 14, 18); g.fillStyle(C.amberHot, 1); g.fillRect(16, 13, 8, 12); L(2, C.bone, 0.7); g.beginPath(); g.arc(20, 30, 16, 3.6, 5.8); g.strokePath(); });
   icon('kindle', () => { g.fillStyle(C.amber, 1); g.fillTriangle(20, 6, 30, 26, 10, 26); g.fillStyle(C.amberHot, 1); g.fillTriangle(20, 14, 25, 26, 15, 26); g.fillStyle(C.bone, 1); g.fillRect(9, 27, 22, 5); });
   icon('chest', () => { g.fillStyle(0x7a5a38, 1); g.fillRoundedRect(7, 13, 26, 18, 3); L(2, C.amber); g.strokeRoundedRect(7, 13, 26, 18, 3); g.lineBetween(7, 21, 33, 21); g.fillStyle(C.amber, 1); g.fillRect(18, 18, 4, 6); });
+  icon('undo', () => { g.lineStyle(4, C.bone, 1); g.beginPath(); g.arc(22, 22, 11, Math.PI * 1.05, Math.PI * 2.4); g.strokePath(); g.fillStyle(C.bone, 1); g.fillTriangle(4, 20, 16, 14, 14, 27); });
+  icon('help', () => { g.fillStyle(C.bone, 1); g.fillTriangle(20, 4, 31, 16, 9, 16); g.fillRect(16, 15, 8, 12); g.fillStyle(0x8fdf93, 1); g.fillRect(8, 29, 24, 5); g.fillRect(17, 25, 6, 13); });
   icon('item', () => { g.fillStyle(C.bone, 1); g.fillRoundedRect(14, 6, 12, 6, 2); g.fillStyle(C.teal, 1); g.fillCircle(20, 24, 11); g.fillStyle(C.dread, 1); g.fillCircle(17, 21, 4); });
   icon('move', () => { L(3); g.lineBetween(8, 30, 30, 10); g.fillStyle(C.bone, 1); g.fillTriangle(24, 6, 34, 6, 34, 16); g.fillCircle(9, 30, 3); });
   icon('end', () => { L(3, C.amber); g.beginPath(); g.arc(20, 20, 13, -1.2, 4.0); g.strokePath(); g.fillStyle(C.amber, 1); g.fillTriangle(30, 4, 34, 14, 24, 13); });

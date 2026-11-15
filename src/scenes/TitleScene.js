@@ -35,7 +35,7 @@ export default class TitleScene extends Phaser.Scene {
     this.tweens.add({ targets: sub, alpha: 1, duration: 1200, delay: 700 });
 
     const startLabel = meta.tutorialDone ? 'Return to Camp' : 'Begin the Vigil';
-    const b1 = makeButton(this, W / 2, 330, 300, 60, startLabel, () => this.begin(), { size: 20, fill: 0x2a1c0c, stroke: C.amber, sub: meta.tutorialDone ? `${meta.embers} Embers · ${meta.runs} runs` : 'starts with a short guided fight' });
+    const b1 = makeButton(this, W / 2, 330, 300, 60, startLabel, () => this.begin(), { size: 20, fill: 0x2a1c0c, stroke: C.amber, sub: meta.tutorialDone ? `${meta.embers} Embers · ${meta.runs} run${meta.runs === 1 ? '' : 's'}` : 'starts with a short guided fight' });
     const b2 = makeButton(this, W / 2, 404, 300, 46, meta.tutorialDone ? 'Replay the Tutorial' : 'Skip the tutorial', () => {
       if (meta.tutorialDone) this.tutorial();
       else { meta.tutorialDone = true; meta.embers += 40; saveMeta(meta); this.go('camp', { fromTutorial: true }); }
