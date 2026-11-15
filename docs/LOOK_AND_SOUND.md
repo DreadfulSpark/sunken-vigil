@@ -75,3 +75,20 @@ Each enemy type now winds up and lands its blow in its own way:
 | Eel-Priest | Coils back | Throws a chain hook. On a hit, the hero is dragged along the retracting chain. |
 | Tide-Knight | A red glint and a "HEAVY" warning | Overhead slam with a huge shockwave and screen shake |
 | Drowned Bishop | A red glint and a "HEAVY" warning | Water-shockwave slam. Cleave sweeps a wide arc of water. Raising the dead erupts a geyser and the husk climbs out of the pool. The litany spins a ring of red runes, darkens the room and makes every brazier gutter. |
+
+## Enemy mechanics (v3.4)
+
+Every regular enemy gained one new move. Each move is shown in advance in the enemy's intent icon, its "next move" text and on the board, so you can always play around it. None of them appear in the tutorial fight.
+
+| Enemy | New move | How to answer it |
+|---|---|---|
+| Lamp-Cultist | **Lamp Throw.** Every third round it locks a 3×3 area at the start of your turn, shown in orange. On its turn it hurls its lamp there: 1d6 fire and 2 turns of Burning to everyone inside. The fire lights the area until the end of the next round. | Leave the orange squares. The fire also lights foes, which you can use. |
+| Wick-Snuffer | **Lantern Thief.** It goes after whoever carries the lantern. A hit knocks the lantern a tile away, onto the ground. | Guard the bearer. Walk over the lantern to pick it back up. |
+| Gutter-Wretch | **Hit and Run.** After it attacks, it slips up to 2 tiles back toward the dark. | Mark it, light it up, or catch it with a parry riposte. |
+| Drowned Husk | **Drag Under.** If its victim is next to open deep water, a hit drags them in. They're Floundering, so foes get Advantage and the water deals drowning damage. | Don't fight a husk with your back to deep water. |
+| Choir Wretch | **Dirge.** Every other turn, if no hero is next to it, it sings: +8 Dread to every hero it can see. | Break its line of sight, or close in, since it's fragile up close. |
+| Eel-Priest | **Snare.** A hooked hero is Snared, so every foe that acts after the eel this phase attacks them with Advantage. | Parry the hook, or kill the eel first. |
+| Censer-Monk | **Ward.** On alternate turns, if no ally needs healing, it wards the ally nearest your heroes. The ward absorbs the next 6 damage. | Break the ward with small hits, or kill the monk. |
+| Tide-Knight | **Charge.** If a hero stands in a straight open line 2–5 tiles away, it charges along it and strikes for +2 damage and a 2-tile shove. The charge lane is shown in red. | Step out of the line. A charge into a hero with a wall behind them also causes a wall slam. |
+
+**Fix:** an enemy's plan used to be counted one turn later than the preview, so the Bishop's cycle could do something other than his intent showed. Now the intent you see is the move that happens.

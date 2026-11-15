@@ -243,6 +243,7 @@ function makeEnemyUnit(id, kind, x, y, tier) {
     pulls: def.pulls ?? 0, shoves: def.shoves ?? 0, elite: !!def.elite, boss: !!def.boss, heavy: !!def.heavy,
     silver: def.silver ?? 5, critOn: 20, mods: {}, guardBuff: 0,
     marked: 0, dead: false, drowning: false, dazed: 0, burning: 0, turn: 0, enraged: false, inDeep: false,
+    lampCd: 1, lampAim: null, ward: 0,
   };
 }
 
@@ -444,6 +445,7 @@ export function attackMode(s, attacker, target, ranged = false) {
   if (attacker.side === 'hero' && attacker.mods?.firstAdv && !attacker.attackedYet) adv.push('Black Pearl');
   if (attacker.virtue === 'focused') adv.push('Focused');
   if (target.inDeep) adv.push('Floundering target');
+  if (attacker.side === 'enemy' && target.snared) adv.push('Snared');
   const darkSight = attacker.mods?.darkSight;
   if (target.side === 'enemy' && !darkSight) {
     if (!visibleToHeroes(s, target)) dis.push('Unseen');
@@ -542,6 +544,7 @@ function targetScore(s, e, h) {
   if (e.darkHunter) score -= l === LIGHT.DARK ? 40 : l === LIGHT.DIM ? 15 : 0;
   if (h.inDeep) score -= 10;
   if (e.kind === 'gutter') score -= (3 - alive(s, 'hero').filter((o) => o !== h && cheb(o, h) <= 2).length) * 12;
+  if (e.kind === 'snuffer' && s.lantern.carrier === h.id) score -= 30;
   return score + cheb(e, h) * 3;
 }
 function bestTile(s, e, reach, test) {
@@ -582,6 +585,9 @@ export function planEnemy(s, e) {
   if (e.boss) return planBishop(s, e, heroes);
   const ranked = [...heroes].sort((a, b) => targetScore(s, e, a) - targetScore(s, e, b));
   const reach = reachable(s, e);
+
+  const sig = s.tutorial ? null : signatureMove(s, e, heroes);
+  if (sig) return sig;
 
   if (e.healer) {
     const wounded = alive(s, 'enemy').filter((o) => o !== e && o.hp < o.maxHp - 3).sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0];
@@ -631,6 +637,72 @@ export function planEnemy(s, e) {
   return { type: 'move', path: walkToward(s, e, ranked[0]), target: ranked[0] };
 }
 
+// ---------- enemy signature moves ----------
+const passableLine = (s, x, y) => !isSolid(tileAt(s, x, y)) && tileAt(s, x, y) !== '~' && !unitAt(s, x, y);
+
+// The Tide-Knight charges a hero standing in a straight, open line 2-5 tiles away.
+export function chargeLine(s, e, heroes) {
+  let best = null;
+  for (const h of heroes) {
+    const dx = h.x - e.x, dy = h.y - e.y, d = cheb(e, h);
+    if (d < 2 || d > 5 || !(dx === 0 || dy === 0 || Math.abs(dx) === Math.abs(dy))) continue;
+    const sx = Math.sign(dx), sy = Math.sign(dy), path = [];
+    let ok = true;
+    for (let i = 1; i < d; i++) { const x = e.x + sx * i, y = e.y + sy * i; if (!passableLine(s, x, y)) { ok = false; break; } path.push({ x, y }); }
+    if (ok && (!best || d < best.d)) best = { d, h, path };
+  }
+  return best;
+}
+// Where a Drowned Husk can drag its victim: an open deep-water tile beside them.
+export function dragTile(s, h) {
+  if (h.swims || h.inDeep) return null;
+  return neighbors(s, h).find((p) => tileAt(s, p.x, p.y) === '~' && !unitAt(s, p.x, p.y)) ?? null;
+}
+// Where a Gutter-Wretch slips away to after striking: far from heroes, ideally in the dark.
+export function retreatTile(s, e) {
+  const reach = reachable(s, e, 2);
+  const heroes = alive(s, 'hero');
+  return bestTile(s, e, reach, (x, y, c) => -Math.min(...heroes.map((h) => cheb(h, { x, y }))) * 10 - (lightAt(s, x, y) === LIGHT.DARK ? 6 : 0) + c);
+}
+// Called at the start of each party phase: cultists ready to throw lock in their target area,
+// so the danger zone shown to the player is exactly where the fire will land.
+export function lockAims(s) {
+  if (s.tutorial) return;
+  const heroes = alive(s, 'hero');
+  for (const e of alive(s, 'enemy')) {
+    if (e.kind !== 'cultist' || e.lampCd > 0 || e.lampAim || e.dazed || e.drowning) continue;
+    let best = null;
+    for (const h of heroes) {
+      if (cheb(e, h) > 4 || cheb(e, h) < 2 || !los(s, e.x, e.y, h.x, h.y)) continue;
+      const caught = heroes.filter((o) => cheb(o, h) <= 1).length;
+      if (!best || caught > best.caught) best = { caught, x: h.x, y: h.y };
+    }
+    if (best) e.lampAim = { x: best.x, y: best.y };
+  }
+}
+export function dirgeTargets(s, e) {
+  return alive(s, 'hero').filter((h) => cheb(h, e) <= 5 && los(s, e.x, e.y, h.x, h.y));
+}
+function signatureMove(s, e, heroes) {
+  const adjacent = heroes.filter((h) => cheb(h, e) <= 1);
+  if (e.kind === 'cultist' && e.lampAim) return { type: 'lamp', path: [], area: e.lampAim, target: null };
+  if (e.kind === 'knight' && !adjacent.length) {
+    const c = chargeLine(s, e, heroes);
+    if (c) return { type: 'charge', path: c.path, target: c.h };
+  }
+  if (e.kind === 'choir' && e.turn % 2 === 1 && !adjacent.length) {
+    const t = dirgeTargets(s, e);
+    if (t.length) return { type: 'dirge', path: [], targets: t, target: null };
+  }
+  if (e.kind === 'censer' && e.turn % 2 === 0) {
+    const wounded = alive(s, 'enemy').some((o) => o !== e && o.hp < o.maxHp - 3);
+    const ally = alive(s, 'enemy').filter((o) => o !== e && !o.ward && cheb(o, e) <= 4)
+      .sort((a, b) => Math.min(...heroes.map((h) => cheb(h, a))) - Math.min(...heroes.map((h) => cheb(h, b))))[0];
+    if (!wounded && ally) return { type: 'ward', path: [], ally, target: null };
+  }
+  return null;
+}
+
 function planBishop(s, e, heroes) {
   const adjacent = heroes.filter((h) => cheb(h, e) <= 1);
   if (adjacent.length) return { type: 'cleave', path: [], target: adjacent[0] };
@@ -659,9 +731,19 @@ export function intentText(s, e) {
   const p = planEnemy(s, e);
   const who = p.target ? HEROES[p.target.id]?.name ?? p.target.name : '';
   switch (p.type) {
-    case 'attack': return `Next: attacks ${who} · ${e.dmg}${e.heavy ? ' · HEAVY' : ''}`;
+    case 'attack': {
+      let rider = '';
+      if (!s.tutorial && e.kind === 'gutter') rider = ' · then slips back into the dark';
+      if (!s.tutorial && e.kind === 'husk' && dragTile(s, p.target)) rider = ' · drags them into deep water';
+      if (!s.tutorial && e.kind === 'snuffer' && s.lantern.carrier === p.target.id) rider = ' · knocks the lantern loose';
+      return `Next: attacks ${who} · ${e.dmg}${e.heavy ? ' · HEAVY' : ''}${rider}`;
+    }
+    case 'lamp': return 'Next: hurls its burning lamp at the marked area · 1d6 fire, sets alight';
+    case 'charge': return `Next: CHARGES ${who} in a line · ${e.dmg} +2 damage · shoves 2 · step out of the line`;
+    case 'dirge': return `Next: sings a Dirge · +8 Dread to every hero it can see (${p.targets.length})`;
+    case 'ward': return `Next: wards the ${p.ally.name} · absorbs the next 6 damage`;
     case 'shoot': return `Next: shoots ${who} · ${e.dmg}${e.dreadOnHit ? ` · +${e.dreadOnHit} Dread` : ''}`;
-    case 'pull': return `Next: hooks ${who} and drags them ${e.pulls} tiles`;
+    case 'pull': return `Next: hooks ${who}, drags them ${e.pulls} tiles and Snares them (foes get Advantage)`;
     case 'snuff': case 'snuffFar': return 'Next: snuffs a brazier';
     case 'heal': return `Next: heals the ${p.ally.name}`;
     case 'cleave': return `Next: cleaves everyone adjacent · ${e.dmg} · HEAVY`;

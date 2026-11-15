@@ -224,6 +224,10 @@ export function makeTextures(scene) {
   intent('move', () => { g.fillStyle(W, 1); g.fillCircle(10, 20, 3); g.fillCircle(20, 20, 3); g.fillCircle(30, 20, 3); });
   intent('dazed', () => { g.lineStyle(3, W, 1); for (let i = 0; i < 3; i++) { g.beginPath(); g.arc(20, 20, 4 + i * 5, i, i + 4); g.strokePath(); } });
   intent('sink', () => { g.lineStyle(3, W, 1); for (let i = 0; i < 3; i++) { g.beginPath(); g.arc(20, 14 + i * 8, 12, 0.3, 2.8); g.strokePath(); } });
+  intent('lamp', () => { g.fillStyle(0xff8a3a, 1); g.fillTriangle(20, 2, 30, 22, 10, 22); g.fillStyle(0xffd27a, 1); g.fillTriangle(20, 10, 25, 22, 15, 22); g.fillStyle(W, 1); g.fillRect(12, 24, 16, 10); });
+  intent('charge', () => { g.fillStyle(W, 1); g.fillTriangle(4, 6, 18, 20, 4, 34); g.fillTriangle(18, 6, 32, 20, 18, 34); g.fillRect(32, 8, 4, 24); });
+  intent('dirge', () => { g.fillStyle(W, 1); g.fillCircle(12, 30, 5); g.fillRect(15, 6, 3, 25); g.fillRect(15, 6, 14, 4); g.lineStyle(2, W, 0.8); g.beginPath(); g.arc(28, 22, 6, -0.9, 0.9); g.strokePath(); g.beginPath(); g.arc(28, 22, 11, -0.9, 0.9); g.strokePath(); });
+  intent('ward', () => { g.fillStyle(0x8fdf93, 1); g.fillPoints([{ x: 20, y: 4 }, { x: 34, y: 10 }, { x: 31, y: 26 }, { x: 20, y: 36 }, { x: 9, y: 26 }, { x: 6, y: 10 }], true); g.fillStyle(0x0d1719, 1); g.fillRect(18, 10, 4, 20); });
   intent('heal', () => { g.fillStyle(0x8fdf93, 1); g.fillRect(16, 6, 8, 28); g.fillRect(6, 16, 28, 8); });
 
   // ---- UI icons ----

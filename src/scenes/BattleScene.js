@@ -13,8 +13,8 @@ const T = 60, BX = 34, BY = 92, BW = 13 * T, BH = 9 * T;
 const PX = 842, PW = 410;
 const DARK_ALPHA = [0.64, 0.32, 0];
 const rand = (a) => a[Math.floor(Math.random() * a.length)];
-const INTENT_TEX = { attack: 'in_attack', shoot: 'in_shoot', pull: 'in_pull', snuff: 'in_snuff', snuffFar: 'in_snuff', cleave: 'in_cleave', raise: 'in_raise', litany: 'in_litany', move: 'in_move', dazed: 'in_dazed', sink: 'in_sink', heal: 'in_heal', psalm: 'in_pull' };
-const DANGER = ['attack', 'shoot', 'pull', 'cleave', 'psalm'];
+const INTENT_TEX = { attack: 'in_attack', shoot: 'in_shoot', pull: 'in_pull', snuff: 'in_snuff', snuffFar: 'in_snuff', cleave: 'in_cleave', raise: 'in_raise', litany: 'in_litany', move: 'in_move', dazed: 'in_dazed', sink: 'in_sink', heal: 'in_heal', psalm: 'in_pull', lamp: 'in_lamp', charge: 'in_charge', dirge: 'in_dirge', ward: 'in_ward' };
+const DANGER = ['attack', 'shoot', 'pull', 'cleave', 'psalm', 'lamp', 'charge', 'dirge'];
 
 export default class BattleScene extends Phaser.Scene {
   constructor() { super('battle'); }
@@ -393,7 +393,9 @@ export default class BattleScene extends Phaser.Scene {
       if (u.drowning) b.push('SINKING');
       if (u.inDeep) b.push(u.side === 'hero' ? 'DROWNING' : 'IN DEEP');
       if (u.burning > 0) b.push('BURNING');
-      if (u.guardBuff) b.push('WARDED');
+      if (u.guardBuff) b.push('+2 GUARD');
+      if (u.ward > 0) b.push(`WARD ${u.ward}`);
+      if (u.snared) b.push('SNARED');
       if (u.resolve) b.push('RESOLUTE');
       if (u.virtue) b.push(VIRTUES[u.virtue].name.toUpperCase());
       if (u.flaw) b.push(FLAWS[u.flaw].name.toUpperCase());
@@ -455,7 +457,22 @@ export default class BattleScene extends Phaser.Scene {
       const ex = this.tx(e.x), ey = this.ty(e.y);
       if (plan.target && danger) this.dashed(ex, ey, this.tx(plan.target.x), this.ty(plan.target.y), 0xd0402c, 0.6);
       if ((plan.type === 'snuff' || plan.type === 'snuffFar') && plan.brazier) this.dashed(ex, ey, this.tx(plan.brazier.x), this.ty(plan.brazier.y), C.amber, 0.6);
-      if (plan.type === 'heal' && plan.ally) this.dashed(ex, ey, this.tx(plan.ally.x), this.ty(plan.ally.y), 0x8fdf93, 0.6);
+      if ((plan.type === 'heal' || plan.type === 'ward') && plan.ally) this.dashed(ex, ey, this.tx(plan.ally.x), this.ty(plan.ally.y), 0x8fdf93, 0.6);
+      if (plan.type === 'lamp' && plan.area) {
+        // the exact 3x3 the fire will land on: step out of it
+        const { x: ax, y: ay } = plan.area;
+        this.dashed(ex, ey, this.tx(ax), this.ty(ay), 0xff8a3a, 0.7);
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+          const tx = ax + dx, ty = ay + dy;
+          if (tx < 0 || ty < 0 || tx >= this.s.w || ty >= this.s.h) continue;
+          this.intentG.fillStyle(0xff6a2a, 0.18); this.intentG.fillRect(this.tx(tx) - T / 2 + 2, this.ty(ty) - T / 2 + 2, T - 4, T - 4);
+          this.intentG.lineStyle(2, 0xff8a3a, 0.75); this.intentG.strokeRect(this.tx(tx) - T / 2 + 2, this.ty(ty) - T / 2 + 2, T - 4, T - 4);
+        }
+      }
+      if (plan.type === 'charge' && plan.path?.length) {
+        for (const st of plan.path) { this.intentG.fillStyle(0xd0402c, 0.16); this.intentG.fillRect(this.tx(st.x) - T / 2 + 4, this.ty(st.y) - T / 2 + 4, T - 8, T - 8); }
+      }
+      if (plan.type === 'dirge') for (const h of plan.targets) this.dashed(ex, ey, this.tx(h.x), this.ty(h.y), 0xc8a0ff, 0.5);
       const bx = ex + 22 * t.big, by = ey - 26 * t.big;
       const bg = this.add.circle(bx, by, 13, danger ? 0x5a1010 : 0x1b2a2a, 1).setStrokeStyle(2, danger ? (e.heavy ? 0xffd27a : 0xd0402c) : C.amber);
       const ic = this.add.image(bx, by, INTENT_TEX[plan.type] ?? 'in_move').setScale(0.55);
@@ -881,6 +898,7 @@ export default class BattleScene extends Phaser.Scene {
       if (u.mods.regen && u.hp < u.maxHp) { u.hp = Math.min(u.maxHp, u.hp + u.mods.regen); floatText(this, this.tx(u.x), this.ty(u.y) - 20, `+${u.mods.regen}`, '#8fdf93', { size: 18 }); }
     }
     for (const e of R.alive(s, 'enemy')) if (e.guardBuff) e.guardBuff = 0;
+    R.lockAims(s);
     await this.tickBurning('hero');
     sfx.phase();
     await this.banner(`Round ${s.round}`, 'Party Phase');
@@ -1279,6 +1297,14 @@ export default class BattleScene extends Phaser.Scene {
     if (u.dead) return;
     const t = this.tokens.get(u.id);
     if (u.flaw === 'frail') amount += 2;
+    if (u.ward > 0 && amount > 0) {
+      const soak = Math.min(u.ward, amount);
+      u.ward -= soak; amount -= soak;
+      FX.shieldDome(this, t.c.x, t.c.y, 0x8fdf93);
+      floatText(this, t.c.x, t.c.y - 44, u.ward > 0 ? `WARD -${soak}` : 'WARD BROKEN', '#8fdf93', { size: 15 });
+      sfx.parry();
+      if (amount <= 0) { this.refreshBars(); await this.wait(quiet ? 120 : 220); return; }
+    }
     u.hp = Math.max(0, u.hp - amount);
     (crit || amount >= 10 ? sfx.bigHit : sfx.hit)();
     t.flash.setAlpha(0.8);
@@ -1435,7 +1461,10 @@ export default class BattleScene extends Phaser.Scene {
       if (h.inDeep && !h.swims) await this.damage(h, R.die(this.rng, 6), { quiet: true, source: 'drowning' });
       if (!h.dead && R.lightAt(s, h.x, h.y) === R.LIGHT.DARK && !R.hasRelic(this.run, 'r_tongue') && !h.mods.darkDreadImmune) this.addDread(h, 8);
     }
-    s.flare = false; s.fireAt = null;
+    s.flare = false;
+    if (s.fireTurns > 0) s.fireTurns--; else s.fireAt = null;
+    for (const h of R.heroUnits(s)) h.snared = false;
+    for (const e of R.alive(s, 'enemy')) e.lampAim = null;
     this.refreshAll();
     await this.checkDread();
     if (await this.checkEnd()) return;
@@ -1444,16 +1473,24 @@ export default class BattleScene extends Phaser.Scene {
     this.startRound();
   }
   async enemyTurn(e) {
-    e.turn++;
     const plan = R.planEnemy(this.s, e);
+    e.turn++;
+    if (e.kind === 'cultist' && plan.type !== 'lamp' && e.lampCd > 0) e.lampCd--;
     const t = this.tokens.get(e.id);
     if (plan.type === 'sink') { await this.sinkUnit(e); return; }
     if (plan.type === 'dazed') { e.dazed--; floatText(this, t.c.x, t.c.y - 30, 'DAZED', HEX.amber, { size: 18 }); this.refreshBars(); await this.wait(450); return; }
     if (plan.type === 'wait') return;
     if (R.visibleToHeroes(this.s, e)) await this.tween({ targets: t.c, scale: 1.12, duration: 110, yoyo: true });
-    if (plan.path?.length) await this.walk(e, plan.path);
+    if (plan.path?.length && plan.type !== 'charge') await this.walk(e, plan.path);
     switch (plan.type) {
-      case 'attack': if (R.cheb(e, plan.target) <= 1) await this.enemyStrike(e, plan.target, false); break;
+      case 'attack':
+        if (R.cheb(e, plan.target) <= 1) await this.enemyStrike(e, plan.target, false);
+        if (e.kind === 'gutter' && !this.s.tutorial && !e.dead && !this.over) await this.gutterRetreat(e);
+        break;
+      case 'lamp': await this.hurlLamp(e, plan.area); break;
+      case 'charge': await this.knightCharge(e, plan); break;
+      case 'dirge': await this.singDirge(e); break;
+      case 'ward': await this.censerWard(e, plan.ally); break;
       case 'shoot': await this.enemyStrike(e, plan.target, true); break;
       case 'pull': await this.enemyPull(e, plan.target, e.dmg, e.pulls); break;
       case 'psalm': floatText(this, t.c.x, t.c.y - 50, 'DROWNING PSALM', HEX.red, { size: 16 }); await this.enemyPull(e, plan.target, '1d8', 2); break;
@@ -1543,7 +1580,7 @@ export default class BattleScene extends Phaser.Scene {
     this.resetPose(e);
   }
 
-  async enemyStrike(e, h, ranged) {
+  async enemyStrike(e, h, ranged, opts = {}) {
     if (h.dead) return;
     if (this.tut) await this.tut.trigger('beforeEnemyAttack');
     await this.enemyWindUp(e, h, ranged);
@@ -1552,7 +1589,7 @@ export default class BattleScene extends Phaser.Scene {
     if (!res.hit) { await this.settle(e); this.resetPose(e); this.missFx(h, res.fumble ? 'FUMBLE' : 'MISS'); return; }
     if (ranged) { await this.settle(e); await this.enemyShot(e, h); }
     else await this.enemyMelee(e, h, res.crit);
-    let dmg = R.rollDice(this.rng, e.dmg, res.crit ? 2 : 1).total;
+    let dmg = R.rollDice(this.rng, e.dmg, res.crit ? 2 : 1).total + (opts.bonus ?? 0);
     let mult = 1;
     let reacted = 'none';
     if (h.reaction) {
@@ -1591,7 +1628,128 @@ export default class BattleScene extends Phaser.Scene {
     if (h.dead) return;
     if (res.crit) this.addDread(h, 10);
     if (e.dreadOnHit) this.addDread(h, Math.round(e.dreadOnHit * (mult < 1 ? 0.5 : 1)));
-    if (e.shoves && !h.dead) await this.push(e, h, e.shoves);
+    if (!this.s.tutorial && !h.dead && e.kind === 'snuffer' && this.s.lantern.carrier === h.id) this.knockLantern(h, e);
+    if (!this.s.tutorial && !h.dead && e.kind === 'husk') {
+      const dt = R.dragTile(this.s, h);
+      if (dt) await this.dragUnder(e, h, dt);
+    }
+    if ((opts.shove ?? e.shoves) && !h.dead) await this.push(e, h, opts.shove ?? e.shoves);
+  }
+
+  // ---------- enemy signature moves ----------
+  async hurlLamp(e, area) {
+    const s = this.s;
+    e.lampAim = null; e.lampCd = 2;
+    const t = this.tokens.get(e.id);
+    const ax = this.tx(area.x), ay = this.ty(area.y);
+    FX.face(t, this.tx(e.x), ax);
+    floatText(this, t.c.x, t.c.y - 50, 'THE LAMP IS LIT', HEX.amberHot, { size: 16 });
+    this.tweens.add({ targets: [t.glyph, t.flash], y: t.glyphY - 12, duration: 200, yoyo: true, hold: 120 });
+    sfx.kindle();
+    await this.wait(260);
+    sfx.whoosh();
+    await FX.bolt(this, t.c.x, t.c.y - 20, ax, ay - 6, 0xff8a3a, { lob: 70, dur: 380, size: 1.3 });
+    this.resetPose(e);
+    sfx.fire(); this.cameras.main.shake(260, 0.01);
+    this.fx.fire.explode(70, ax, ay);
+    FX.smash(this, ax, ay, 0xff8a3a, true);
+    s.fireAt = { x: area.x, y: area.y }; s.fireTurns = 1;
+    this.refreshLight();
+    this.log('The cultist lights its lamp at last, and throws it.', HEX.amberHot);
+    for (const v of R.alive(s).filter((u) => R.cheb(u, area) <= 1 && u !== e)) {
+      await this.damage(v, R.die(this.rng, 6), { quiet: true, source: 'lamp-fire' });
+      if (!v.dead) v.burning = Math.max(v.burning, 2);
+    }
+    this.refreshAll();
+  }
+  async knightCharge(e, plan) {
+    const h = plan.target;
+    const t = this.tokens.get(e.id);
+    FX.face(t, this.tx(e.x), this.tx(h.x));
+    FX.glint(this, t.c.x + 10, t.c.y - 50);
+    floatText(this, t.c.x, t.c.y - 62, 'CHARGE', HEX.red, { size: 18 });
+    await this.tween({ targets: t.c, scaleX: 0.86, scaleY: 1.12, duration: 220, ease: 'Quad.Out' });
+    sfx.whoosh();
+    for (const st of plan.path) {
+      e.x = st.x; e.y = st.y;
+      t.c.setDepth(32 + st.y * 0.01);
+      FX.afterimage(this, t, 0xd0402c);
+      this.fx.dust.explode(5, t.c.x, t.c.y + 18);
+      sfx.step();
+      await this.tween({ targets: t.c, x: this.tx(st.x), y: this.ty(st.y), scaleX: 1.1, scaleY: 0.94, duration: 70, ease: 'Linear' });
+    }
+    this.refreshLight(); this.refreshVisibility();
+    await this.enemyStrike(e, h, false, { bonus: 2, shove: 2 });
+  }
+  async singDirge(e) {
+    const t = this.tokens.get(e.id);
+    floatText(this, t.c.x, t.c.y - 50, 'DIRGE', HEX.dread, { size: 18 });
+    this.tweens.add({ targets: [t.glyph, t.flash], y: t.glyphY - 12, duration: 300, yoyo: true, hold: 500 });
+    sfx.scream();
+    await this.wait(200);
+    const targets = R.dirgeTargets(this.s, e);
+    await Promise.all(targets.map((h, i) => new Promise((r) => this.time.delayedCall(i * 120, () => FX.soundWave(this, t.c.x, t.c.y - 14, this.tx(h.x), this.ty(h.y) - 10, 0xc8a0ff).then(r)))));
+    for (const h of targets) { this.addDread(h, 8); this.fx.dread.explode(10, this.tx(h.x), this.ty(h.y)); }
+    this.log('The choir sings a dirge. Every hero who hears it remembers someone drowned.', HEX.dread);
+    this.resetPose(e);
+    this.refreshAll();
+    await this.wait(300);
+  }
+  async censerWard(e, ally) {
+    if (!ally || ally.dead) return;
+    const et = this.tokens.get(e.id);
+    sfx.chime();
+    this.tweens.add({ targets: [et.glyph, et.flash], angle: { from: -14, to: 14 }, duration: 160, yoyo: true, repeat: 1 });
+    await FX.bolt(this, this.tx(e.x), this.ty(e.y) - 14, this.tx(ally.x), this.ty(ally.y) - 10, 0x8fdf93, { lob: 50, size: 1 });
+    this.resetPose(e);
+    ally.ward = 6;
+    FX.shieldDome(this, this.tx(ally.x), this.ty(ally.y), 0x8fdf93);
+    FX.incense(this, this.tx(ally.x), this.ty(ally.y));
+    floatText(this, this.tx(ally.x), this.ty(ally.y) - 30, 'WARD 6', '#8fdf93', { size: 17 });
+    this.refreshAll();
+    await this.wait(300);
+  }
+  async gutterRetreat(e) {
+    const tile = R.retreatTile(this.s, e);
+    if (!tile || (tile.x === e.x && tile.y === e.y)) return;
+    const reach = R.reachable(this.s, e, 2);
+    const path = R.pathFrom(this.s, reach, tile.x, tile.y);
+    if (!path.length) return;
+    const t = this.tokens.get(e.id);
+    floatText(this, t.c.x, t.c.y - 40, 'SLIPS AWAY', HEX.boneDim, { size: 14 });
+    for (const st of path) {
+      e.x = st.x; e.y = st.y;
+      t.c.setDepth(32 + st.y * 0.01);
+      FX.afterimage(this, t, 0x3a2a2a);
+      await this.tween({ targets: t.c, x: this.tx(st.x), y: this.ty(st.y), duration: 90, ease: 'Quad.Out' });
+    }
+    this.refreshVisibility();
+  }
+  knockLantern(h, e) {
+    const s = this.s;
+    const away = R.neighbors(s, h).filter((p) => !R.isSolid(R.tileAt(s, p.x, p.y)) && R.tileAt(s, p.x, p.y) !== '~' && !R.unitAt(s, p.x, p.y))
+      .sort((a, b) => R.cheb(b, e) - R.cheb(a, e))[0] ?? { x: h.x, y: h.y };
+    s.lantern = { carrier: null, x: away.x, y: away.y };
+    const sx = this.lanternImg.x, sy = this.lanternImg.y, ex = this.tx(away.x), ey = this.ty(away.y);
+    this.lanternFlying = true;
+    this.tweens.add({ targets: { v: 0 }, v: 1, duration: 320, onUpdate: (tw) => {
+      const v = tw.getValue();
+      const x = sx + (ex - sx) * v, y = sy + (ey - sy) * v - Math.sin(v * Math.PI) * 40;
+      this.lanternImg.setPosition(x, y).setAngle(v * 300); this.lanternGlow.setPosition(x, y);
+    }, onComplete: () => { this.lanternImg.setAngle(0); this.lanternFlying = false; sfx.land(); this.fx.spark.explode(14, ex, ey); this.refreshAll(); } });
+    floatText(this, this.tx(h.x), this.ty(h.y) - 50, 'LANTERN KNOCKED LOOSE', HEX.red, { size: 15 });
+    this.log('The snuffer slaps the lantern from your hand. Pick it up again by walking over it.', HEX.red);
+  }
+  async dragUnder(e, h, tile) {
+    const t = this.tokens.get(h.id);
+    floatText(this, this.tx(h.x), this.ty(h.y) - 50, 'DRAGGED UNDER', HEX.red, { size: 16 });
+    h.x = tile.x; h.y = tile.y;
+    t.c.setDepth(32 + tile.y * 0.01);
+    FX.afterimage(this, t, 0x7fe0ff);
+    await this.tween({ targets: t.c, x: this.tx(tile.x), y: this.ty(tile.y), duration: 180, ease: 'Quad.In' });
+    this.refreshLight();
+    await this.fallInWater(h, e);
+    this.refreshAll();
   }
   async enemyPull(e, h, dmgSpec, dist) {
     if (h.dead) return;
@@ -1622,6 +1780,7 @@ export default class BattleScene extends Phaser.Scene {
       this.refreshLight();
     }
     chain.retract(160);
+    if (!this.s.tutorial && !h.dead) { h.snared = true; floatText(this, this.tx(h.x), this.ty(h.y) - 50, 'SNARED', HEX.red, { size: 15 }); }
     if (pp.result === 'water') await this.fallInWater(h, null);
     await this.damage(h, R.rollDice(this.rng, dmgSpec).total, { quiet: true });
     this.refreshAll();
