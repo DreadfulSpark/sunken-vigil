@@ -244,7 +244,7 @@ function makeEnemyUnit(id, kind, x, y, tier) {
     pulls: def.pulls ?? 0, shoves: def.shoves ?? 0, elite: !!def.elite, boss: !!def.boss, heavy: !!def.heavy,
     silver: def.silver ?? 5, critOn: 20, mods: {}, guardBuff: 0,
     marked: 0, dead: false, drowning: false, dazed: 0, burning: 0, turn: 0, enraged: false, inDeep: false,
-    lampCd: 1, lampAim: null, ward: 0,
+    lampCd: 1, lampAim: null, ward: 0, waveAim: null, diveCd: 0,
   };
 }
 
@@ -685,6 +685,40 @@ export function lockAims(s) {
     }
     if (best) e.lampAim = { x: best.x, y: best.y };
   }
+  for (const e of alive(s, 'enemy')) {
+    if (!e.boss || e.waveAim || e.dazed || e.drowning) continue;
+    if (e.turn % 4 === 3 || (e.enraged && (e.turn + 1) % 4 === 3)) {
+      const w = waveBand(s, e, heroes);
+      if (w) e.waveAim = { axis: w.axis, c: w.c, dir: w.dir };
+    }
+  }
+}
+// ---------- the Bishop's signatures ----------
+// The Tide Sermon: a 3-wide lane (rows or columns) that catches the most heroes. The wave runs away from him.
+export function waveBand(s, e, heroes) {
+  let best = null;
+  for (const h of heroes) for (const axis of ['row', 'col']) {
+    const c = axis === 'row' ? h.y : h.x;
+    const caught = heroes.filter((o) => Math.abs((axis === 'row' ? o.y : o.x) - c) <= 1).length;
+    if (!best || caught > best.caught || (caught === best.caught && axis === 'row' && best.axis === 'col')) {
+      const dir = axis === 'row' ? { x: Math.sign(h.x - e.x) || 1, y: 0 } : { x: 0, y: Math.sign(h.y - e.y) || 1 };
+      best = { caught, axis, c, dir };
+    }
+  }
+  return best;
+}
+export const inWave = (aim, p) => Math.abs((aim.axis === 'row' ? p.y : p.x) - aim.c) <= 1;
+// From the Deep: he hunts whoever stands most alone, and surfaces beside them (water first).
+function surfaceTile(s, e, h) {
+  const rank = (p) => (tileAt(s, p.x, p.y) === '~' ? 0 : tileAt(s, p.x, p.y) === ',' ? 1 : 2);
+  return neighbors(s, h).filter((p) => !isSolid(tileAt(s, p.x, p.y)) && !unitAt(s, p.x, p.y))
+    .sort((a, b) => rank(a) - rank(b) || cheb(a, e) - cheb(b, e) || a.y - b.y || a.x - b.x)[0] ?? null;
+}
+export function diveTarget(s, e, heroes) {
+  const friends = (h) => heroes.filter((o) => o !== h && cheb(o, h) <= 2).length;
+  const order = [...heroes].sort((a, b) => friends(a) - friends(b) || a.hp - b.hp);
+  for (const h of order) { const tile = surfaceTile(s, e, h); if (tile) return { h, tile }; }
+  return null;
 }
 export function dirgeTargets(s, e) {
   return alive(s, 'hero').filter((h) => cheb(h, e) <= 5 && los(s, e.x, e.y, h.x, h.y));
@@ -710,7 +744,12 @@ function signatureMove(s, e, heroes) {
 }
 
 function planBishop(s, e, heroes) {
+  if (e.waveAim) return { type: 'wave', path: [], area: e.waveAim, targets: heroes.filter((h) => inWave(e.waveAim, h)), target: null };
   const adjacent = heroes.filter((h) => cheb(h, e) <= 1);
+  if (e.enraged && !adjacent.length && (e.diveCd ?? 0) <= 0) {
+    const d = diveTarget(s, e, heroes);
+    if (d) return { type: 'dive', path: [], target: d.h, tile: d.tile };
+  }
   if (adjacent.length) return { type: 'cleave', path: [], target: adjacent[0] };
   const cycle = e.turn % 4;
   const inPsalm = heroes.filter((h) => cheb(h, e) <= 4 && los(s, e.x, e.y, h.x, h.y));
@@ -748,6 +787,8 @@ export function intentText(s, e) {
     case 'charge': return `Next: CHARGES ${who} in a line · ${e.dmg} +2 damage · shoves 2 · step out of the line`;
     case 'dirge': return `Next: sings a Dirge · +8 Dread to every hero it can see (${p.targets.length})`;
     case 'ward': return `Next: wards the ${p.ally.name} · absorbs the next 6 damage`;
+    case 'wave': return `Next: THE TIDE SERMON · a wave sweeps the marked ${p.area.axis === 'row' ? 'rows' : 'columns'} · 1d6, shoves 2 · get out of the lane (${p.targets.length} caught)`;
+    case 'dive': return `Next: FROM THE DEEP · sinks and surfaces beside ${who} · HEAVY ${e.dmg}, +3 damage · Snares · ends his turn · he hunts whoever stands alone`;
     case 'shoot': return `Next: shoots ${who} · ${e.dmg}${e.dreadOnHit ? ` · +${e.dreadOnHit} Dread` : ''}`;
     case 'pull': return `Next: hooks ${who}, drags them ${e.pulls} tiles and Snares them (foes get Advantage)`;
     case 'snuff': case 'snuffFar': return 'Next: snuffs a brazier';

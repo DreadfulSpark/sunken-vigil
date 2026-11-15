@@ -231,6 +231,9 @@ export function makeTextures(scene) {
   intent('charge', () => { g.fillStyle(W, 1); g.fillTriangle(4, 6, 18, 20, 4, 34); g.fillTriangle(18, 6, 32, 20, 18, 34); g.fillRect(32, 8, 4, 24); });
   intent('dirge', () => { g.fillStyle(W, 1); g.fillCircle(12, 30, 5); g.fillRect(15, 6, 3, 25); g.fillRect(15, 6, 14, 4); g.lineStyle(2, W, 0.8); g.beginPath(); g.arc(28, 22, 6, -0.9, 0.9); g.strokePath(); g.beginPath(); g.arc(28, 22, 11, -0.9, 0.9); g.strokePath(); });
   intent('ward', () => { g.fillStyle(0x8fdf93, 1); g.fillPoints([{ x: 20, y: 4 }, { x: 34, y: 10 }, { x: 31, y: 26 }, { x: 20, y: 36 }, { x: 9, y: 26 }, { x: 6, y: 10 }], true); g.fillStyle(0x0d1719, 1); g.fillRect(18, 10, 4, 20); });
+  const wavy = (y0, a = 1) => { g.lineStyle(4, W, a); g.beginPath(); for (let x = 4; x <= 36; x += 2) { const y = y0 + Math.sin(x / 4) * 3; if (x === 4) g.moveTo(x, y); else g.lineTo(x, y); } g.strokePath(); };
+  intent('wave', () => { wavy(10); wavy(20); wavy(30, 0.7); });
+  intent('dive', () => { g.fillStyle(W, 1); g.fillRect(17, 2, 6, 14); g.fillTriangle(9, 14, 31, 14, 20, 25); wavy(31, 0.85); });
   intent('heal', () => { g.fillStyle(0x8fdf93, 1); g.fillRect(16, 6, 8, 28); g.fillRect(6, 16, 28, 8); });
 
   // ---- UI icons ----

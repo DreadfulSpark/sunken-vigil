@@ -346,3 +346,87 @@ export function clockFace(scene, x, y) {
   scene.tweens.add({ targets: hands, angle: -720, duration: 900, ease: 'Quad.InOut' });
   scene.tweens.add({ targets: [g, hands], alpha: 0, scale: 2, duration: 300, delay: 900, onComplete: () => { g.destroy(); hands.destroy(); } });
 }
+
+// ---------------- boss signature effects ----------------
+
+// a wall of black water crashing down a lane, foam spraying off its crest
+export function tidalWave(scene, x0, y0, x1, y1, dir, color = 0x5fb8c0) {
+  return new Promise((done) => {
+    const horiz = dir.x !== 0, sgn = horiz ? dir.x : dir.y;
+    const len = horiz ? x1 - x0 : y1 - y0, span = horiz ? y1 - y0 : x1 - x0;
+    const fwd = horiz ? (sgn > 0 ? 0 : 180) : (sgn > 0 ? 90 : 270);
+    const g = scene.add.graphics().setDepth(54);
+    const foam = scene.add.particles(0, 0, 'drop', {
+      speed: { min: 120, max: 320 }, angle: { min: fwd - 40, max: fwd + 40 }, gravityY: 260, lifespan: { min: 220, max: 420 },
+      scale: { start: 2, end: 0.4 }, alpha: { start: 1, end: 0 }, tint: [0xe8fbf6, 0xbfe6dc, color], emitting: false,
+    }).setDepth(55);
+    // map (along, across) lane coordinates to the screen
+    const P = (a, c) => (horiz ? [x0 + a, y0 + c] : [x0 + c, y0 + a]);
+    const rect = (a0, a1, c0, c1, col, al) => {
+      const [ax, ay] = P(Math.min(a0, a1), c0), [bx, by] = P(Math.max(a0, a1), c1);
+      g.fillStyle(col, al); g.fillRect(ax, ay, bx - ax, by - ay);
+    };
+    const st = { v: 0, wob: 0 };
+    const draw = () => {
+      g.clear();
+      const head = sgn > 0 ? st.v * len : len - st.v * len, tail = sgn > 0 ? 0 : len;
+      // the body of the wave: deep water behind, brightening up to the crest
+      rect(tail, head, 0, span, 0x0c2f36, 0.6);
+      rect(head - sgn * 130, head, 0, span, 0x1f5f66, 0.55);
+      rect(head - sgn * 60, head, 0, span, color, 0.6);
+      // the curl: a ragged band of lit water, then white foam riding the very front
+      for (let c = 0; c < span; c += 4) {
+        const w = 14 + Math.sin(c * 0.16 + st.wob) * 7 + Math.sin(c * 0.05 - st.wob * 0.7) * 6;
+        rect(head - sgn * (w + 22), head - sgn * w, c, c + 4, 0xbff4f8, 0.75);
+        rect(head - sgn * w, head + sgn * (4 + Math.sin(c * 0.4 + st.wob * 2) * 3), c, c + 4, 0xf4fffc, 0.95);
+      }
+      // dark streaks inside the body so it reads as moving water, not a flat panel
+      for (let k = 0; k < 4; k++) {
+        const a = head - sgn * (30 + ((k * 37 + st.wob * 20) % 120)), c = ((k * 53) % 100) / 100 * span;
+        rect(a - sgn * 26, a, c, c + 3, 0x08262b, 0.5);
+      }
+      for (let i = 0; i < 6; i++) { const [fx, fy] = P(head, Math.random() * span); foam.emitParticleAt(fx, fy, 1); }
+    };
+    scene.tweens.add({ targets: st, v: 1, wob: 14, duration: 780, ease: 'Sine.In', onUpdate: draw, onComplete: () => {
+      const [ex, ey] = P(sgn > 0 ? len : 0, span / 2);
+      for (let i = 0; i < 24; i++) { const [fx, fy] = P(sgn > 0 ? len : 0, Math.random() * span); foam.emitParticleAt(fx, fy, 1); }
+      impact(scene, ex, ey, 0xd9f5ef, { crit: true, ang: horiz ? (sgn > 0 ? 0 : Math.PI) : (sgn > 0 ? Math.PI / 2 : -Math.PI / 2) });
+      scene.tweens.add({ targets: g, alpha: 0, duration: 420, onComplete: () => g.destroy() });
+      scene.time.delayedCall(900, () => foam.destroy());
+      done();
+    } });
+  });
+}
+
+// a sucking whirlpool where something big goes under
+export function whirlpool(scene, x, y) {
+  const g = scene.add.graphics({ x, y }).setDepth(33).setBlendMode(ADD);
+  const st = { a: 0, k: 1 };
+  const draw = () => {
+    g.clear();
+    for (let i = 0; i < 4; i++) {
+      const r = (10 + i * 9) * st.k;
+      g.lineStyle(3 - i * 0.5, 0x9fd6cb, 0.9 - i * 0.18);
+      g.beginPath(); g.arc(0, 0, r, st.a + i, st.a + i + 3.6); g.strokePath();
+    }
+    g.setScale(1, 0.42);
+  };
+  scene.tweens.add({ targets: st, a: 9, k: 0.35, duration: 700, ease: 'Quad.In', onUpdate: draw, onComplete: () => g.destroy() });
+  scene.fx.brine.explode(24, x, y);
+}
+
+// a wake racing under the floor: rings opening one after another along the path
+export function wake(scene, x0, y0, x1, y1) {
+  return new Promise((done) => {
+    const d = Math.hypot(x1 - x0, y1 - y0), n = Math.max(3, Math.round(d / 30));
+    for (let i = 0; i <= n; i++) {
+      scene.time.delayedCall(i * 55, () => {
+        const v = i / n, x = x0 + (x1 - x0) * v, y = y0 + (y1 - y0) * v + 10;
+        const r = scene.add.ellipse(x, y, 10, 4).setStrokeStyle(2, 0x7fe0ff, 0.9).setDepth(33).setBlendMode(ADD);
+        scene.tweens.add({ targets: r, scaleX: 4.6, scaleY: 3.6, alpha: 0, duration: 480, onComplete: () => r.destroy() });
+        scene.fx.brine.explode(4, x, y);
+        if (i === n) done();
+      });
+    }
+  });
+}

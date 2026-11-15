@@ -13,8 +13,8 @@ const T = 60, BX = 34, BY = 92, BW = 13 * T, BH = 9 * T;
 const PX = 842, PW = 410;
 const DARK_ALPHA = [0.64, 0.32, 0];
 const rand = (a) => a[Math.floor(Math.random() * a.length)];
-const INTENT_TEX = { attack: 'in_attack', shoot: 'in_shoot', pull: 'in_pull', snuff: 'in_snuff', snuffFar: 'in_snuff', cleave: 'in_cleave', raise: 'in_raise', litany: 'in_litany', move: 'in_move', dazed: 'in_dazed', sink: 'in_sink', heal: 'in_heal', psalm: 'in_pull', lamp: 'in_lamp', charge: 'in_charge', dirge: 'in_dirge', ward: 'in_ward' };
-const DANGER = ['attack', 'shoot', 'pull', 'cleave', 'psalm', 'lamp', 'charge', 'dirge'];
+const INTENT_TEX = { attack: 'in_attack', shoot: 'in_shoot', pull: 'in_pull', snuff: 'in_snuff', snuffFar: 'in_snuff', cleave: 'in_cleave', raise: 'in_raise', litany: 'in_litany', move: 'in_move', dazed: 'in_dazed', sink: 'in_sink', heal: 'in_heal', psalm: 'in_pull', lamp: 'in_lamp', charge: 'in_charge', dirge: 'in_dirge', ward: 'in_ward', wave: 'in_wave', dive: 'in_dive' };
+const DANGER = ['attack', 'shoot', 'pull', 'cleave', 'psalm', 'lamp', 'charge', 'dirge', 'wave', 'dive'];
 
 export default class BattleScene extends Phaser.Scene {
   constructor() { super('battle'); }
@@ -472,6 +472,32 @@ export default class BattleScene extends Phaser.Scene {
       }
       if (plan.type === 'charge' && plan.path?.length) {
         for (const st of plan.path) { this.intentG.fillStyle(0xd0402c, 0.16); this.intentG.fillRect(this.tx(st.x) - T / 2 + 4, this.ty(st.y) - T / 2 + 4, T - 8, T - 8); }
+      }
+      if (plan.type === 'wave' && plan.area) {
+        const a = plan.area, G = this.intentG;
+        for (let y = 0; y < this.s.h; y++) for (let x = 0; x < this.s.w; x++) {
+          if (!R.inWave(a, { x, y }) || R.isSolid(R.tileAt(this.s, x, y))) continue;
+          G.fillStyle(0x3fb8c8, 0.26); G.fillRect(this.tx(x) - T / 2 + 2, this.ty(y) - T / 2 + 2, T - 4, T - 4);
+        }
+        const lo = Math.max(0, a.c - 1), hi = Math.min((a.axis === 'row' ? this.s.h : this.s.w) - 1, a.c + 1);
+        G.lineStyle(2, 0x9fe8f0, 0.75);
+        if (a.axis === 'row') G.strokeRect(this.tx(0) - T / 2, this.ty(lo) - T / 2, this.s.w * T, (hi - lo + 1) * T);
+        else G.strokeRect(this.tx(lo) - T / 2, this.ty(0) - T / 2, (hi - lo + 1) * T, this.s.h * T);
+        const n = a.axis === 'row' ? this.s.w : this.s.h, d = a.dir;
+        for (let i = 1; i < n; i += 2) {
+          const cx = a.axis === 'row' ? this.tx(i) : this.tx(a.c), cy = a.axis === 'row' ? this.ty(a.c) : this.ty(i);
+          const px = -d.y, py = d.x;
+          G.lineStyle(4, 0xbff4f8, 0.85);
+          G.lineBetween(cx - d.x * 6 + px * 9, cy - d.y * 6 + py * 9, cx + d.x * 7, cy + d.y * 7);
+          G.lineBetween(cx - d.x * 6 - px * 9, cy - d.y * 6 - py * 9, cx + d.x * 7, cy + d.y * 7);
+        }
+      }
+      if (plan.type === 'dive' && plan.tile) {
+        const sx = this.tx(plan.tile.x), sy = this.ty(plan.tile.y);
+        this.dashed(ex, ey, sx, sy, 0x7fe0ff, 0.55);
+        this.intentG.fillStyle(0x7fe0ff, 0.2); this.intentG.fillRect(sx - T / 2 + 2, sy - T / 2 + 2, T - 4, T - 4);
+        this.intentG.lineStyle(2, 0x7fe0ff, 0.8); this.intentG.strokeRect(sx - T / 2 + 2, sy - T / 2 + 2, T - 4, T - 4);
+        for (let i = 0; i < 3; i++) { this.intentG.lineStyle(3 - i * 0.6, 0xbff4f8, 0.95 - i * 0.25); this.intentG.strokeEllipse(sx, sy + 6, 16 + i * 14, 7 + i * 6); }
       }
       if (plan.type === 'dirge') for (const h of plan.targets) this.dashed(ex, ey, this.tx(h.x), this.ty(h.y), 0xc8a0ff, 0.5);
       const bx = ex + 22 * t.big, by = ey - 26 * t.big;
@@ -1109,8 +1135,8 @@ export default class BattleScene extends Phaser.Scene {
     await this.push(u, e, sk.push + R.shoveBonus(u) + (res.crit ? 1 : 0), { slamBonus: u.mods.slam ?? 0, by: u });
   }
 
-  async push(from, e, dist, { slamBonus = 0, by = null } = {}) {
-    const pp = R.shovePath(this.s, from, e, dist);
+  async push(from, e, dist, { slamBonus = 0, by = null, dir = null } = {}) {
+    const pp = dir ? R.pushPath(this.s, e, dir.x, dir.y, dist) : R.shovePath(this.s, from, e, dist);
     const t = this.tokens.get(e.id);
     sfx.whoosh();
     for (const st of pp.path) {
@@ -1544,8 +1570,10 @@ export default class BattleScene extends Phaser.Scene {
     const order = R.alive(s, 'enemy').sort((a, b) => (b.snuffs ? 1 : 0) - (a.snuffs ? 1 : 0) || (b.healer ? 1 : 0) - (a.healer ? 1 : 0));
     for (const e of order) {
       if (e.dead || this.over) continue;
+      e.surfaced = false;
       await this.enemyTurn(e);
-      if (e.boss && e.enraged && !e.dead && !this.over) await this.enemyTurn(e);
+      // surfacing from the deep spends his whole turn: no second blow on the same round
+      if (e.boss && e.enraged && !e.dead && !this.over && !e.surfaced) await this.enemyTurn(e);
       if (!e.dead && e.inDeep && (e.elite || e.boss) && R.hasRelic(this.run, 'r_undertow')) await this.damage(e, R.rollDice(this.rng, '2d6').total, { quiet: true, source: 'undertow' });
       if (await this.checkEnd()) return;
       await this.wait(140);
@@ -1557,7 +1585,7 @@ export default class BattleScene extends Phaser.Scene {
     s.flare = false;
     if (s.fireTurns > 0) s.fireTurns--; else s.fireAt = null;
     for (const h of R.heroUnits(s)) h.snared = false;
-    for (const e of R.alive(s, 'enemy')) e.lampAim = null;
+    for (const e of R.alive(s, 'enemy')) { e.lampAim = null; e.waveAim = null; }
     this.refreshAll();
     await this.checkDread();
     if (await this.checkEnd()) return;
@@ -1569,6 +1597,7 @@ export default class BattleScene extends Phaser.Scene {
     const plan = R.planEnemy(this.s, e);
     e.turn++;
     if (e.kind === 'cultist' && plan.type !== 'lamp' && e.lampCd > 0) e.lampCd--;
+    if (e.boss && plan.type !== 'dive' && e.diveCd > 0) e.diveCd--;
     const t = this.tokens.get(e.id);
     if (plan.type === 'sink') { await this.sinkUnit(e); return; }
     if (plan.type === 'dazed') { e.dazed--; floatText(this, t.c.x, t.c.y - 30, 'DAZED', HEX.amber, { size: 18 }); this.refreshBars(); await this.wait(450); return; }
@@ -1584,6 +1613,8 @@ export default class BattleScene extends Phaser.Scene {
       case 'charge': await this.knightCharge(e, plan); break;
       case 'dirge': await this.singDirge(e); break;
       case 'ward': await this.censerWard(e, plan.ally); break;
+      case 'wave': await this.tideSermon(e, plan.area); break;
+      case 'dive': await this.bishopDive(e, plan); break;
       case 'shoot': await this.enemyStrike(e, plan.target, true); break;
       case 'pull': await this.enemyPull(e, plan.target, e.dmg, e.pulls); break;
       case 'psalm': floatText(this, t.c.x, t.c.y - 50, 'DROWNING PSALM', HEX.red, { size: 16 }); await this.enemyPull(e, plan.target, '1d8', 2); break;
@@ -1774,6 +1805,71 @@ export default class BattleScene extends Phaser.Scene {
     this.refreshLight(); this.refreshVisibility();
     await this.enemyStrike(e, h, false, { bonus: 2, shove: 2 });
   }
+  // ---------- the Bishop's signatures ----------
+  async tideSermon(e, aim) {
+    const s = this.s;
+    e.waveAim = null;
+    const t = this.tokens.get(e.id);
+    floatText(this, t.c.x, t.c.y - 72, 'THE TIDE SERMON', HEX.red, { size: 19, dur: 1500 });
+    this.log('The Bishop raises his arms and preaches to the water. The water listens.', HEX.red);
+    this.tweens.add({ targets: [t.glyph, t.flash], y: t.glyphY - 16, scaleY: t.glyph.scaleX * 1.1, duration: 320, yoyo: true, hold: 420, ease: 'Quad.Out' });
+    sfx.bell(); FX.glint(this, t.c.x, t.c.y - 64, 0x9fd6cb);
+    FX.geyser(this, t.c.x, t.c.y);
+    await this.wait(520);
+    const lo = Math.max(0, aim.c - 1), hi = Math.min((aim.axis === 'row' ? s.h : s.w) - 1, aim.c + 1);
+    const rect = aim.axis === 'row'
+      ? [this.tx(0) - T / 2, this.ty(lo) - T / 2, this.tx(s.w - 1) + T / 2, this.ty(hi) + T / 2]
+      : [this.tx(lo) - T / 2, this.ty(0) - T / 2, this.tx(hi) + T / 2, this.ty(s.h - 1) + T / 2];
+    sfx.splash(); sfx.whoosh();
+    await FX.tidalWave(this, ...rect, aim.dir);
+    this.cameras.main.shake(420, 0.011);
+    this.resetPose(e);
+    // downstream heroes are moved first, so nobody is shoved into a friend still waiting to be swept
+    const along = (h) => (aim.dir.x ? h.x * aim.dir.x : h.y * aim.dir.y);
+    const caught = R.alive(s, 'hero').filter((h) => R.inWave(aim, h)).sort((a, b) => along(b) - along(a));
+    if (!caught.length) { this.log('The wave breaks on empty stone.', HEX.boneDim); await this.wait(300); return; }
+    for (const h of caught) {
+      if (h.dead || this.over) continue;
+      let mult = 1, shove = 2;
+      if (h.reaction) {
+        h.reaction = false;
+        const r = await this.reactRing(h, e);
+        if (r === 'perfect') { mult = 0.5; shove = 0; this.run.stats.parries++; floatText(this, this.tx(h.x), this.ty(h.y) - 50, 'BRACED', HEX.amberHot, { size: 16 }); }
+        else if (r === 'good') { mult = 0.75; shove = 1; }
+      }
+      h.burning = 0;
+      this.fx.brine.explode(24, this.tx(h.x), this.ty(h.y));
+      await this.damage(h, Math.max(1, Math.ceil(R.rollDice(this.rng, '1d6').total * mult)), { quiet: true, source: 'the tide', by: e });
+      if (!h.dead && shove && !this.over) await this.push(null, h, shove, { dir: aim.dir, by: e });
+    }
+    this.refreshAll();
+    await this.wait(250);
+  }
+  async bishopDive(e, plan) {
+    const h = plan.target, tile = plan.tile;
+    if (!h || h.dead || R.unitAt(this.s, tile.x, tile.y)) return;
+    e.diveCd = 3; e.surfaced = true;
+    const t = this.tokens.get(e.id);
+    floatText(this, t.c.x, t.c.y - 72, 'FROM THE DEEP', HEX.red, { size: 19, dur: 1500 });
+    this.log(`The Bishop sinks into his flooded apse. Somewhere near ${this.hname(h)}, the water bulges.`, HEX.red);
+    sfx.splash();
+    FX.whirlpool(this, t.c.x, t.c.y + 8);
+    await this.tween({ targets: t.c, scaleX: 1.25, scaleY: 0.25, alpha: 0, y: t.c.y + 22, duration: 460, ease: 'Quad.In' });
+    const sx = this.tx(tile.x), sy = this.ty(tile.y);
+    await FX.wake(this, this.tx(e.x), this.ty(e.y), sx, sy);
+    e.x = tile.x; e.y = tile.y;
+    e.inDeep = R.tileAt(this.s, tile.x, tile.y) === '~';
+    t.c.setPosition(sx, sy + 22).setDepth(32 + tile.y * 0.01);
+    FX.face(t, sx, this.tx(h.x));
+    FX.geyser(this, sx, sy);
+    this.fx.brine.explode(50, sx, sy);
+    sfx.scream(); this.cameras.main.shake(320, 0.011);
+    await this.tween({ targets: t.c, scaleX: 1, scaleY: 1, alpha: 1, y: sy, duration: 420, ease: 'Back.Out' });
+    this.refreshLight(); this.refreshVisibility();
+    await this.enemyStrike(e, h, false, { bonus: 3 });
+    if (!h.dead && !this.over) { h.snared = true; floatText(this, this.tx(h.x), this.ty(h.y) - 56, 'SNARED', HEX.red, { size: 15 }); }
+    this.refreshAll();
+  }
   async singDirge(e) {
     const t = this.tokens.get(e.id);
     floatText(this, t.c.x, t.c.y - 50, 'DIRGE', HEX.dread, { size: 18 });
@@ -1957,8 +2053,9 @@ export default class BattleScene extends Phaser.Scene {
       const x = t.c.x, y = t.c.y;
       const heavy = !!e?.heavy && !h.mods.heavyParry;
       const g = this.add.graphics().setDepth(85);
-      const label = this.add.text(x, y - 68, heavy ? 'HEAVY: REACT!' : 'REACT!', { fontFamily: FONT_H, fontSize: '20px', color: heavy ? '#ff8a6a' : HEX.amberHot, fontStyle: '900', stroke: '#050b0c', strokeThickness: 5 }).setOrigin(0.5).setDepth(86);
-      const help = this.add.text(x, y + 64, 'SPACE / CLICK when the rings meet', { fontFamily: FONT_H, fontSize: '12px', color: HEX.bone, fontStyle: '700', stroke: '#050b0c', strokeThickness: 4 }).setOrigin(0.5).setDepth(86);
+      const lx = Math.max(130, Math.min(this.scale.width - 130, x));
+      const label = this.add.text(lx, y - 68, heavy ? 'HEAVY: REACT!' : 'REACT!', { fontFamily: FONT_H, fontSize: '20px', color: heavy ? '#ff8a6a' : HEX.amberHot, fontStyle: '900', stroke: '#050b0c', strokeThickness: 5 }).setOrigin(0.5).setDepth(86);
+      const help = this.add.text(lx, y + 64, 'SPACE / CLICK when the rings meet', { fontFamily: FONT_H, fontSize: '12px', color: HEX.bone, fontStyle: '700', stroke: '#050b0c', strokeThickness: 4 }).setOrigin(0.5).setDepth(86);
       const lead = 450, close = 800;
       const win = R.parryWindow(h);
       const start = this.time.now + lead;

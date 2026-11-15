@@ -84,6 +84,21 @@ W.heroTurn = async (u) => {
     b.onTile(ts[0].x, ts[0].y); await W.battleIdle();
     return true;
   };
+  // step out of a marked Tide Sermon lane first, the way a player would
+  const lane = R.alive(s, 'enemy').find((e) => e.waveAim && R.inWave(e.waveAim, u))?.waveAim;
+  if (lane && !u.moved) {
+    b.chooseAction('move'); await W.tick(40);
+    const reach = R.reachable(s, u);
+    const foes = R.alive(s, 'enemy');
+    let best = null;
+    for (const [k] of reach.dist) {
+      const x = k % s.w, y = Math.floor(k / s.w);
+      if (!R.canStop(s, u, x, y) || R.inWave(lane, { x, y })) continue;
+      const d = Math.min(...foes.map((e) => Math.max(Math.abs(e.x - x), Math.abs(e.y - y))));
+      if (!best || d < best.d) best = { x, y, d };
+    }
+    if (best) { b.onTile(best.x, best.y); await W.battleIdle(); }
+  }
   // use signature abilities when they would matter
   const ready = (id) => u.skills.includes(id) && R.skillTargets(s, u, id).length;
   if (ready('chain') && await tryAct('chain')) return;

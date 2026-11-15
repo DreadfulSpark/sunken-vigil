@@ -104,3 +104,19 @@ On the action bar, a gold gem marks a signature that's ready, and its icon pulse
 | **Brannoc** | **Floodgate Stand** | Leaps and slams his shield. Every adjacent foe is shoved 1 tile; walls and deep water still punish them. He gains +2 Guard (Brace) and **taunts**: every foe within 4 must come for him next enemy phase, so he can pull the choir off Ysolde or the gutter off a lone hero. | 3 rounds |
 | **Ysolde** | **Chain of Names** | Ranged 5. On a hit it deals 1d8+2 lightning, then the name arcs to up to 2 more foes within 2 tiles of each other (1d6+1 each, no roll). A jagged lightning bolt leaps from body to body. | 3 rounds |
 | **Old Hesk** | **The Ninth Hour** | An ally within 3 who has already moved or acted gets both back. Bell rings and a backwards-spinning golden clock appear over them. Use it to give Brannoc a second Undertow, or Ysolde a second Chain of Names. | Once per fight |
+
+## The Drowned Bishop's new attacks (v3.6)
+
+The Bishop keeps his cleave, Drowning Psalm, Raise Dead, snuffing and Backwards Litany, and gains two signature attacks. Both are shown in advance.
+
+| Attack | When | Effect | How to answer it |
+|---|---|---|---|
+| **The Tide Sermon** | Every fourth turn. Once enraged he acts twice, so it comes about every other round. | At the start of your turn he locks a 3-wide lane of rows or columns, tinted teal with chevrons showing which way the water will run. On his turn a wall of black water crashes down it: 1d6 to every hero inside, then a 2-tile shove downstream. Walls cause a slam, deep water swallows, and the water puts out Burning. | Step out of the lane. A perfect reaction **braces** you: half damage and no shove. A good one gives ¾ damage and a 1-tile shove. |
+| **From the Deep** | Enraged only (below half HP), when no hero is next to him; recharges for 3 of his turns. | He sinks in a whirlpool, a wake races across the floor, and he erupts in a geyser beside the hero with the fewest allies within 2 tiles. Then a HEAVY strike for +3 damage that Snares them. Surfacing spends his whole turn. | Stay together. The surfacing tile and the target are both marked, so you can wall it off or step into his blow with Brannoc. |
+
+The reaction ring's "REACT!" label and hint now stay on screen when a hero stands at the edge of the board.
+
+![The Tide Sermon](shots-v3/18-tide-sermon.jpg)
+![From the Deep: the wake, then the Bishop surfacing beside Old Hesk](shots-v3/19-from-the-deep.jpg)
+
+Balance check: the bot (now taught to step out of marked lanes) fought the Bishop 5 times with a late-run party. With the old Bishop it left him on 0–19 HP (avg 11); with the new one, 0–32 (avg 14). One bot win in each set.

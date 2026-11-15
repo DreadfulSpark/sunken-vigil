@@ -80,7 +80,7 @@ export const ENEMIES = {
     silver: 20, lore: 'Elite. Rusted plate, full of lake. Its blows are HEAVY: a perfect parry only halves them. Charges anyone standing in a straight open line.' },
   bishop: { name: 'The Drowned Bishop', hp: 80, guard: 13, atk: 6, move: 3, dmg: '1d10+4', boss: true, heavy: true,
     swims: true, silver: 60,
-    lore: 'Preached until the water came, and preaches still. Cleaves, hooks, snuffs, raises the dead and, when wounded, floods the apse.' },
+    lore: 'Preached until the water came, and preaches still. Cleaves, hooks, snuffs and raises the dead. Every few turns he preaches the Tide Sermon: a wave down a marked lane. Wounded, he floods the apse, acts twice, and dives to surface beside whoever stands alone.' },
 };
 
 // ---------- loot ----------
