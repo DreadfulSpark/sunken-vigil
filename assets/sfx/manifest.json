@@ -1,0 +1,525 @@
+{
+ "click": {
+  "files": [
+   "click_0.ogg",
+   "click_1.ogg",
+   "click_2.ogg"
+  ],
+  "vol": 0.45,
+  "wet": 0
+ },
+ "hover": {
+  "files": [
+   "hover_0.ogg",
+   "hover_1.ogg"
+  ],
+  "vol": 0.18,
+  "wet": 0,
+  "rate": [
+   0.95,
+   1.1
+  ]
+ },
+ "select": {
+  "files": [
+   "select_0.ogg",
+   "select_1.ogg",
+   "select_2.ogg"
+  ],
+  "vol": 0.45,
+  "wet": 0.05
+ },
+ "denied": {
+  "files": [
+   "denied_0.ogg",
+   "denied_1.ogg"
+  ],
+  "vol": 0.35,
+  "wet": 0
+ },
+ "ring": {
+  "files": [
+   "ring_0.ogg"
+  ],
+  "vol": 0.2,
+  "wet": 0
+ },
+ "page": {
+  "files": [
+   "page_0.ogg",
+   "page_1.ogg",
+   "page_2.ogg"
+  ],
+  "vol": 0.55,
+  "wet": 0.1
+ },
+ "equip": {
+  "files": [
+   "equip_0.wav",
+   "equip_1.wav",
+   "equip_2.wav",
+   "equip_3.ogg",
+   "equip_4.ogg"
+  ],
+  "vol": 0.6,
+  "wet": 0.08
+ },
+ "coin": {
+  "files": [
+   "coin_0.ogg",
+   "coin_1.ogg",
+   "coin_2.ogg",
+   "coin_3.ogg",
+   "coin_4.ogg",
+   "coin_5.ogg"
+  ],
+  "vol": 0.6,
+  "wet": 0.12
+ },
+ "chest": {
+  "files": [
+   "chest_0.ogg",
+   "chest_1.ogg",
+   "chest_2.ogg"
+  ],
+  "vol": 0.7,
+  "wet": 0.2
+ },
+ "loot": {
+  "files": [
+   "loot_0.ogg",
+   "loot_1.ogg",
+   "loot_2.ogg",
+   "loot_3.ogg"
+  ],
+  "vol": 0.55,
+  "wet": 0.3,
+  "layer": true
+ },
+ "step": {
+  "files": [
+   "step_0.ogg",
+   "step_1.ogg",
+   "step_2.ogg",
+   "step_3.ogg",
+   "step_4.ogg"
+  ],
+  "vol": 0.5,
+  "wet": 0.12
+ },
+ "wade": {
+  "files": [
+   "wade_0.ogg",
+   "wade_1.ogg",
+   "wade_2.ogg",
+   "wade_3.ogg",
+   "wade_4.ogg",
+   "wade_5.ogg"
+  ],
+  "vol": 0.3,
+  "wet": 0.12,
+  "rate": [
+   1.1,
+   1.3
+  ]
+ },
+ "splash": {
+  "files": [
+   "splash_0.ogg",
+   "splash_1.ogg",
+   "splash_2.ogg",
+   "splash_3.ogg",
+   "splash_4.ogg",
+   "splash_5.ogg"
+  ],
+  "vol": 0.85,
+  "wet": 0.3,
+  "rate": [
+   0.8,
+   0.95
+  ]
+ },
+ "dice": {
+  "files": [
+   "dice_0.ogg",
+   "dice_1.ogg",
+   "dice_2.ogg",
+   "dice_3.ogg",
+   "dice_4.ogg"
+  ],
+  "vol": 0.8,
+  "wet": 0.05
+ },
+ "land": {
+  "files": [
+   "land_0.ogg",
+   "land_1.ogg",
+   "land_2.ogg",
+   "land_3.ogg",
+   "land_4.ogg"
+  ],
+  "vol": 0.45,
+  "wet": 0.08
+ },
+ "whoosh": {
+  "files": [
+   "whoosh_0.wav",
+   "whoosh_1.wav",
+   "whoosh_2.wav",
+   "whoosh_3.wav"
+  ],
+  "vol": 0.55,
+  "wet": 0.1
+ },
+ "dodge": {
+  "files": [
+   "dodge_0.ogg",
+   "dodge_1.ogg",
+   "dodge_2.ogg",
+   "dodge_3.ogg",
+   "dodge_4.wav"
+  ],
+  "vol": 0.6,
+  "wet": 0.1
+ },
+ "hit": {
+  "files": [
+   "hit_0.ogg",
+   "hit_1.ogg",
+   "hit_2.ogg",
+   "hit_3.ogg",
+   "hit_4.ogg"
+  ],
+  "vol": 0.85,
+  "wet": 0.18,
+  "also": [
+   "armour"
+  ]
+ },
+ "armour": {
+  "files": [
+   "armour_0.ogg",
+   "armour_1.ogg",
+   "armour_2.ogg",
+   "armour_3.ogg",
+   "armour_4.ogg"
+  ],
+  "vol": 0.3,
+  "wet": 0.2
+ },
+ "bigHit": {
+  "files": [
+   "bighit_0.ogg",
+   "bighit_1.ogg",
+   "bighit_2.ogg",
+   "bighit_3.ogg",
+   "bighit_4.ogg"
+  ],
+  "vol": 1.0,
+  "wet": 0.25,
+  "rate": [
+   0.85,
+   0.95
+  ],
+  "also": [
+   "armourHeavy"
+  ]
+ },
+ "armourHeavy": {
+  "files": [
+   "armourh_0.ogg",
+   "armourh_1.ogg",
+   "armourh_2.ogg",
+   "armourh_3.ogg",
+   "armourh_4.ogg"
+  ],
+  "vol": 0.45,
+  "wet": 0.3
+ },
+ "slam": {
+  "files": [
+   "slam_0.ogg",
+   "slam_1.ogg",
+   "slam_2.ogg",
+   "slam_3.ogg",
+   "slam_4.ogg",
+   "slam_5.ogg"
+  ],
+  "vol": 0.9,
+  "wet": 0.3,
+  "rate": [
+   0.75,
+   0.9
+  ]
+ },
+ "miss": {
+  "files": [
+   "miss_0.wav",
+   "miss_1.wav",
+   "miss_2.wav"
+  ],
+  "vol": 0.5,
+  "wet": 0.1,
+  "rate": [
+   1.0,
+   1.15
+  ]
+ },
+ "crit": {
+  "files": [
+   "crit_0.ogg",
+   "crit_1.ogg",
+   "crit_2.ogg",
+   "crit_3.ogg",
+   "crit_4.ogg"
+  ],
+  "vol": 1.0,
+  "wet": 0.35,
+  "layer": true,
+  "also": [
+   "ringOut"
+  ]
+ },
+ "ringOut": {
+  "files": [
+   "ringout_0.wav"
+  ],
+  "vol": 0.45,
+  "wet": 0.4
+ },
+ "fumble": {
+  "files": [
+   "fumble_0.ogg",
+   "fumble_1.ogg"
+  ],
+  "vol": 0.6,
+  "wet": 0.2
+ },
+ "parry": {
+  "files": [
+   "parry_0.ogg",
+   "parry_1.ogg",
+   "parry_2.ogg",
+   "parry_3.ogg",
+   "parry_4.ogg"
+  ],
+  "vol": 1.0,
+  "wet": 0.35,
+  "rate": [
+   1.0,
+   1.12
+  ],
+  "also": [
+   "ringOut"
+  ]
+ },
+ "brace": {
+  "files": [
+   "brace_0.wav",
+   "brace_1.wav",
+   "brace_2.wav"
+  ],
+  "vol": 0.75,
+  "wet": 0.15,
+  "rate": [
+   0.85,
+   0.95
+  ]
+ },
+ "hook": {
+  "files": [
+   "hook_0.ogg",
+   "hook_1.ogg",
+   "hook_2.ogg"
+  ],
+  "vol": 0.75,
+  "wet": 0.25
+ },
+ "death": {
+  "files": [
+   "death_0.ogg",
+   "death_1.ogg",
+   "death_2.ogg",
+   "death_3.ogg"
+  ],
+  "vol": 0.6,
+  "wet": 0.35,
+  "rate": [
+   0.75,
+   0.9
+  ]
+ },
+ "scream": {
+  "files": [
+   "scream_0.ogg",
+   "scream_1.ogg"
+  ],
+  "vol": 0.5,
+  "wet": 0.5,
+  "rate": [
+   0.8,
+   0.95
+  ]
+ },
+ "raise": {
+  "files": [
+   "raise_0.ogg",
+   "raise_1.ogg",
+   "raise_2.ogg",
+   "raise_3.ogg"
+  ],
+  "vol": 0.7,
+  "wet": 0.45,
+  "layer": true,
+  "rate": [
+   0.7,
+   0.85
+  ]
+ },
+ "kindle": {
+  "files": [
+   "kindle_0.ogg",
+   "kindle_1.ogg",
+   "kindle_2.ogg"
+  ],
+  "vol": 0.7,
+  "wet": 0.2
+ },
+ "fire": {
+  "files": [
+   "fire_0.ogg",
+   "fire_1.ogg",
+   "fire_2.ogg",
+   "fire_3.ogg"
+  ],
+  "vol": 0.85,
+  "wet": 0.3
+ },
+ "snuff": {
+  "files": [
+   "snuff_0.ogg"
+  ],
+  "vol": 0.6,
+  "wet": 0.3,
+  "rate": [
+   1.1,
+   1.3
+  ]
+ },
+ "mark": {
+  "files": [
+   "mark_0.ogg",
+   "mark_1.ogg",
+   "mark_2.wav"
+  ],
+  "vol": 0.5,
+  "wet": 0.4
+ },
+ "dread": {
+  "files": [
+   "dread_0.wav",
+   "dread_1.wav",
+   "dread_2.wav"
+  ],
+  "vol": 0.35,
+  "wet": 0.5,
+  "layer": true,
+  "rate": [
+   0.8,
+   0.9
+  ]
+ },
+ "bell": {
+  "files": [
+   "bell_0.ogg",
+   "bell_1.ogg",
+   "bell_2.ogg",
+   "bell_3.ogg",
+   "bell_4.ogg"
+  ],
+  "vol": 0.75,
+  "wet": 0.6,
+  "rate": [
+   0.85,
+   0.95
+  ]
+ },
+ "chime": {
+  "files": [
+   "chime_0.ogg",
+   "chime_1.ogg",
+   "chime_2.ogg"
+  ],
+  "vol": 0.5,
+  "wet": 0.5
+ },
+ "toll": {
+  "files": [
+   "toll_0.ogg",
+   "toll_1.ogg",
+   "toll_2.ogg",
+   "toll_3.ogg",
+   "toll_4.ogg"
+  ],
+  "vol": 1.0,
+  "wet": 0.8,
+  "rate": [
+   0.55,
+   0.62
+  ],
+  "also": [
+   "gong"
+  ]
+ },
+ "gong": {
+  "files": [
+   "gong_0.ogg",
+   "gong_1.ogg"
+  ],
+  "vol": 0.45,
+  "wet": 0.6,
+  "rate": [
+   0.7,
+   0.8
+  ]
+ },
+ "enemyPhase": {
+  "files": [
+   "ephase_0.ogg",
+   "ephase_1.ogg"
+  ],
+  "vol": 0.35,
+  "wet": 0.7,
+  "rate": [
+   0.55,
+   0.6
+  ],
+  "layer": true
+ },
+ "ambWater": {
+  "files": [
+   "amb_water_0.ogg",
+   "amb_water_1.ogg",
+   "amb_water_2.ogg"
+  ],
+  "vol": 0.22,
+  "wet": 0.2,
+  "rate": [
+   1,
+   1
+  ]
+ },
+ "ambDrip": {
+  "files": [
+   "amb_drip_0.ogg",
+   "amb_drip_1.ogg",
+   "amb_drip_2.ogg"
+  ],
+  "vol": 0.12,
+  "wet": 0.6,
+  "rate": [
+   0.6,
+   0.9
+  ]
+ }
+}

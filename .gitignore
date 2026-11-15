@@ -1,0 +1,14 @@
+# secrets never belong in this repo
+.env
+.env.*
+*.key
+*.pem
+*.p12
+secrets*
+credentials*
+# local junk
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
+._*

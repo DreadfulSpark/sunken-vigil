@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Sunken Vigil</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Spectral:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+  <style>
+    html, body { margin: 0; height: 100%; background: #050b0c; overflow: hidden; }
+    #game { width: 100vw; height: 100vh; }
+    #loading { position: fixed; inset: 0; display: grid; place-items: center; color: #e8a33d; font: italic 18px Georgia, serif; letter-spacing: 2px; }
+  </style>
+</head>
+<body>
+  <div id="loading">Lighting the lantern…</div>
+  <div id="game"></div>
+  <script src="vendor/phaser.min.js"></script>
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
