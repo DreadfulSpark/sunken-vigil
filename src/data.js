@@ -138,12 +138,30 @@ export const ITEMS = [
   { id: 'r_undertow', name: 'Undertow Psalm', icon: 'r_charter', slot: 'relic', rarity: 'relic', text: 'Elites and bosses that end a turn in deep water take 2d6 more.', tag: 'drown' },
   { id: 'r_silence', name: 'Bell of Silence', icon: 'r_bell', slot: 'relic', rarity: 'relic', text: 'Dazed foes stay Dazed for 2 turns.', tag: 'bell' },
   { id: 'r_moth', name: 'Moth Reliquary', icon: 'r_wick', slot: 'relic', rarity: 'cursed', text: 'All heroes have +2 to hit in darkness, but braziers start cold.', tag: 'dark' },
+  // ---- v3.7: the Reliquary update ----
+  { id: 'w_lockhammer', name: "Lock-Keeper's Hammer", icon: 'maul', slot: 'weapon', hero: 'warden', rarity: 'worn', mods: { atk: 1, markDmg: 2 }, text: '+1 to hit. +2 damage against Marked foes.', tag: 'mark' },
+  { id: 'w_gatechain', name: 'Floodgate Chain', icon: 'maul', slot: 'weapon', hero: 'warden', rarity: 'relic', mods: { dmg: 2, guard: 1, darkDmg: 3 }, text: '+2 damage, +1 Guard. +3 damage to foes standing in darkness.', tag: 'dark' },
+  { id: 's_index', name: 'Index of Lightless Things', icon: 'book', slot: 'weapon', hero: 'scholar', rarity: 'blessed', mods: { darkSight: 1, darkDmg: 3 }, text: 'You see into darkness. +3 damage to foes standing in it.', tag: 'dark' },
+  { id: 's_atlas', name: 'The Drowned Atlas', icon: 'book', slot: 'weapon', hero: 'scholar', rarity: 'relic', mods: { boltPush: 1, dmg: 2, slam: 3 }, text: 'Brine Bolts push 1. +2 damage. Your slams deal +3.', tag: 'drown' },
+  { id: 'b_sanctus', name: 'Sanctus Bell', icon: 'bell', slot: 'weapon', hero: 'ringer', rarity: 'worn', mods: { chimeBonus: 1, tollDc: 1, guard: 1 }, text: 'Chime heals +1. Toll DC +1. +1 Guard.', tag: 'bell' },
+  { id: 'b_deepbell', name: 'Bell of the Deep Choir', icon: 'bell', slot: 'weapon', hero: 'ringer', rarity: 'cursed', mods: { tollDmg: 1, darkDmg: 4, dreadMul: 0.25 }, text: 'Toll also deals 1d6 to every foe it reaches. +4 damage in darkness. You gain 25% more Dread.', tag: 'dark' },
+  { id: 'ch_key', name: "Ferryman's Key", icon: 'shard', slot: 'charm', rarity: 'worn', mods: { slam: 2, shove: 1 }, text: 'Your shoves go 1 tile further. Your slams deal +2.', tag: 'drown' },
+  { id: 'ch_signet', name: 'Signet of Names', icon: 'locket', slot: 'charm', rarity: 'blessed', mods: { markDmg: 2, markLong: 1 }, text: '+2 damage against Marked foes. Your Marks last a round longer.', tag: 'mark' },
+  { id: 'ch_clapper', name: 'Loose Clapper', icon: 'bone', slot: 'charm', rarity: 'worn', mods: { dazedVuln: 2, atk: 1 }, text: '+1 to hit. Dazed foes take +2 damage from everyone.', tag: 'bell' },
+  { id: 'ch_mask', name: 'Mourning Mask', icon: 'eye', slot: 'charm', rarity: 'blessed', mods: { darkSight: 1, dreadMul: -0.15 }, text: 'You see into darkness. You gain 15% less Dread.', tag: 'dark' },
+  { id: 'ch_scale', name: 'Leviathan Scale', icon: 'heart', slot: 'charm', rarity: 'relic', mods: { guard: 2, swimHero: 1, maxHp: 4 }, text: '+2 Guard, +4 max HP. You can wade deep water and never drown.', tag: 'drown' },
+  { id: 'ch_coral', name: 'Coral Ring of Thorns', icon: 'locket', slot: 'charm', rarity: 'cursed', mods: { crit: 2, killHeal: 3, maxHp: -6 }, text: 'Crit on 18–20. Killing a foe heals you 3. −6 max HP.' },
+  { id: 'r_magpie', name: "Magpie's Box", icon: 'r_satchel', slot: 'relic', rarity: 'blessed', text: 'Spoils after every fight and chest offer 4 choices instead of 3.' },
+  { id: 'r_reliquary', name: 'Reliquary of Hands', icon: 'r_wick', slot: 'relic', rarity: 'relic', text: 'Elite spoils offer two Relics instead of one.' },
+  { id: 'r_salvage', name: 'Salvage Rights', icon: 'r_charter', slot: 'relic', rarity: 'worn', text: 'Taking nothing from spoils pays 25 Silver instead of 8.' },
   // Consumables
   { id: 'c_salts', name: 'Smelling Salts', icon: 'c_salts', slot: 'consumable', rarity: 'worn', use: 'salts', text: 'A hero loses 30 Dread.' },
   { id: 'c_bandage', name: 'Bandage Roll', icon: 'c_bandage', slot: 'consumable', rarity: 'worn', use: 'bandage', text: 'A hero heals 10.' },
   { id: 'c_oil', name: 'Oil Flask', icon: 'c_oil', slot: 'consumable', rarity: 'blessed', use: 'oil', range: 4, text: 'Throw 4 tiles: 2d6 fire to everything adjacent to where it lands, and they burn.' },
   { id: 'c_holy', name: 'Font Water', icon: 'c_holy', slot: 'consumable', rarity: 'blessed', use: 'holy', text: 'Cure a hero\'s Flaw and lose 20 Dread.' },
   { id: 'c_flare', name: 'Phosphor Flare', icon: 'c_flare', slot: 'consumable', rarity: 'worn', use: 'flare', text: 'The whole room is lit until the end of the round.' },
+  { id: 'c_ash', name: "Saint's Ash", icon: 'c_holy', slot: 'consumable', rarity: 'blessed', use: 'ash', text: 'A hero is Warded: the next 8 damage they take is absorbed.' },
+  { id: 'c_whet', name: 'Whetstone of Bone', icon: 'c_salts', slot: 'consumable', rarity: 'worn', use: 'whet', text: "A hero's attacks deal +3 damage for the rest of this fight." },
 ];
 export const itemById = (id) => ITEMS.find((i) => i.id === id);
 

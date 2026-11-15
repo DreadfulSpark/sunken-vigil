@@ -1,10 +1,21 @@
 // Pick-one-of-N overlays: loot (battles, chests, events, vaults) and talents (elites, sanctuaries).
 import { RARITY, HEROES, TALENTS, itemById } from './data.js';
-import { equipItem, satchelCap, partyHeroes, talentChoices, learnTalent, runRng } from './rules.js';
+import { equipItem, satchelCap, partyHeroes, talentChoices, learnTalent, runRng, RESONANCES, tagCounts, hasRelic } from './rules.js';
 import { makeItemCard, makeCardBack, makeButton, FONT_H, FONT_B, HEX, C } from './ui.js';
 import { unitKey } from './sprites.js';
 import { sfx } from './audio.js';
 
+// what taking this item would do to its Resonance: count after taking it, and whether a tier awakens
+function resonanceAfter(run, it) {
+  if (!it.tag) return null;
+  const r = RESONANCES[it.tag];
+  let now = tagCounts(run)[it.tag];
+  const cur = it.slot === 'weapon' && itemById(run.heroes.find((x) => x.id === it.hero)?.weapon);
+  if (cur?.tag === it.tag) now--;
+  const after = now + 1;
+  const wakes = !!r.tiers.find((t) => t.n === after);
+  return { text: `◆ ${r.name.toUpperCase()} ${Math.min(after, 3)}/3${wakes ? ' · AWAKENS' : ''}`, hex: r.hex, hot: wakes };
+}
 function compareText(run, it) {
   if (it.slot === 'relic') return 'Applies to the whole party.';
   if (it.slot === 'consumable') return `Satchel ${run.consumables.length}/${satchelCap(run)}`;
@@ -31,9 +42,10 @@ function overlay(scene, depth, title, subtitle) {
 
 export function showLootChoice(scene, run, ids, { title = 'Spoils', subtitle = 'Choose one.', skipSilver = 8, onDone, depth = 300 } = {}) {
   const W = scene.scale.width, H = scene.scale.height;
+  if (skipSilver && hasRelic(run, 'r_salvage')) skipSilver = 25;
   const root = overlay(scene, depth, title, subtitle);
   const items = ids.map(itemById).filter(Boolean);
-  const gap = 244;
+  const gap = items.length > 3 ? 236 : 244;
   const x0 = W / 2 - ((items.length - 1) * gap) / 2;
   const cards = [];
   let done = false;
@@ -97,7 +109,7 @@ export function showLootChoice(scene, run, ids, { title = 'Spoils', subtitle = '
   };
   items.forEach((it, i) => {
     const x = x0 + i * gap, y = H / 2 + 34;
-    const card = makeItemCard(scene, x, y, it, RARITY[it.rarity], { foot: compareText(run, it), onPick: (c) => take(c) });
+    const card = makeItemCard(scene, x, y, it, RARITY[it.rarity], { foot: compareText(run, it), tagLine: resonanceAfter(run, it), onPick: (c) => take(c) });
     card.item = it;
     card.locked = true; card.setVisible(false);
     // dealt face down, then each card turns over in turn with a flash in its rarity colour
@@ -115,6 +127,17 @@ export function showLootChoice(scene, run, ids, { title = 'Spoils', subtitle = '
       if (it.rarity === 'relic' || it.rarity === 'cursed') { sfx.loot(it.rarity); scene.cameras.main.shake(120, 0.003); } else sfx.coin();
     } });
     cards.push(card);
+  });
+  // a short legend for every Resonance these cards touch
+  const tags = [...new Set(items.map((it) => it.tag).filter(Boolean))];
+  const counts = tagCounts(run);
+  tags.forEach((tag, i) => {
+    const r = RESONANCES[tag];
+    const line = `◆ ${r.name} (${counts[tag]}/3 carried)    at 2: ${r.tiers[0].text.replace(/^Every hero: /, '')}    at 3: ${r.tiers[1].text.replace(/^Every hero: /, '')}`;
+    const t = scene.add.text(W / 2, H / 2 + 34 + 160 + i * 19, line, { fontFamily: FONT_B, fontSize: '14px', color: r.hex, align: 'center' }).setOrigin(0.5, 0);
+    if (t.width > W - 80) t.setScale((W - 80) / t.width);
+    t.alpha = 0; scene.tweens.add({ targets: t, alpha: 0.95, duration: 400, delay: 900 + i * 120 });
+    root.add(t);
   });
   skip = makeButton(scene, W / 2, H - 46, 260, 44, skipSilver ? `Take nothing (+${skipSilver} Silver)` : 'Take nothing', () => {
     run.silver += skipSilver;

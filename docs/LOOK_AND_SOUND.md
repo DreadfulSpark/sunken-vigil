@@ -120,3 +120,30 @@ The reaction ring's "REACT!" label and hint now stay on screen when a hero stand
 ![From the Deep: the wake, then the Bishop surfacing beside Old Hesk](shots-v3/19-from-the-deep.jpg)
 
 Balance check: the bot (now taught to step out of marked lanes) fought the Bishop 5 times with a late-run party. With the old Bishop it left him on 0–19 HP (avg 11); with the new one, 0–32 (avg 14). One bot win in each set.
+
+## The Reliquary update (v3.7): more loot, Resonances, and a carved action bar
+
+**Resonances.** Most gear has a theme: Drowning, Marking, Bells or Darkness. Collect 2 items of one theme, counting the whole party's weapons, charms and relics, and its Resonance awakens for *every* hero. Collect 3 and it deepens. Awakened Resonances are announced in the chronicle when a fight begins.
+
+| Resonance | Theme | At 2 | At 3 |
+|---|---|---|---|
+| **Undertow** | Drowning | Wall slams +2 | Shoves go 1 tile further |
+| **Litany of Names** | Marking | +2 damage vs Marked foes | +1 to hit, Marks last a round longer |
+| **Carillon** | Bells | Dazed foes take +2 from everyone | +2 to Dread saves, Chime heals +2, Toll DC +1 |
+| **Nightward** | Darkness | +2 damage to foes in darkness | Everyone sees into darkness, 15% less Dread |
+
+Every spoils card shows its Resonance and what you'd have after taking it. If taking it would awaken a tier, the line pulses **AWAKENS**. A legend under the cards spells out each Resonance on offer.
+
+**17 new items**, each with its own pixel icon:
+- **Weapons:** Lock-Keeper's Hammer and Floodgate Chain (Brannoc), Index of Lightless Things and The Drowned Atlas (Ysolde), Sanctus Bell and the cursed Bell of the Deep Choir (Old Hesk).
+- **Charms:** Ferryman's Key, Signet of Names, Loose Clapper, Mourning Mask, Leviathan Scale, and the cursed Coral Ring of Thorns.
+- **Relics that change the loot itself:**
+  - **Magpie's Box** (4 spoils choices instead of 3).
+  - **Reliquary of Hands** (elites offer two Relics).
+  - **Salvage Rights** (skipping spoils pays 25 Silver).
+- **Consumables:** Saint's Ash (Ward 8 on a hero) and Whetstone of Bone (+3 damage for the rest of the fight).
+
+**Action bar.** The battle buttons are now carved stone tiles like the loot reliquaries: a bevelled bronze frame, riveted corners, the icon in a dark niche, and the name on a plate (long names wrap to two lines). They sit in a stone tray with empty sockets for unused slots. Hovering lifts and lights a slot. Signature abilities have a gem set into the top of the frame that glows when ready. END PHASE matches.
+
+![Spoils with Resonances](shots-v3/20-resonance-spoils.jpg)
+![The carved action bar](shots-v3/21-carved-action-bar.jpg)

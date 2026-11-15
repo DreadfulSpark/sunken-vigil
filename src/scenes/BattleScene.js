@@ -1,7 +1,7 @@
 import * as R from '../rules.js';
 import { SKILLS, ENEMIES, HEROES, LINES, RARITY, BARKS, FLAWS, VIRTUES, itemById, talentById } from '../data.js';
 import { sfx, musicPlayer } from '../audio.js';
-import { C, HEX, FONT_H, FONT_B, makeButton, panel, floatText } from '../ui.js';
+import { C, HEX, FONT_H, FONT_B, makeButton, panel, floatText, makeSlot, slotTray } from '../ui.js';
 import { showLootChoice, showTalentChoice } from '../loot.js';
 import { Tutorial } from '../tutorial.js';
 import { saveMeta } from '../save.js';
@@ -63,6 +63,10 @@ export default class BattleScene extends Phaser.Scene {
     this.say(boss ? 'boss' : this.mode === 'tutorial' ? 'runStart' : 'roomStart', {}, boss ? HEX.red : HEX.bone, true);
     await this.banner(this.s.roomName, boss ? 'The Bishop awaits' : this.mode === 'tutorial' ? 'A first lesson' : `Depth ${this.run.depth}`);
     if (this.tut) await this.tut.start();
+    // awakened Resonances are announced as the fight opens
+    if (!this.tut) for (const r of R.activeResonances(this.run)) {
+      this.log(`◆ ${r.name} ${r.level === 2 ? 'II' : 'I'}: ${r.tiers.map((t) => t.text).join(' ')}`, r.hex);
+    }
     this.startRound();
   }
 
@@ -545,9 +549,10 @@ export default class BattleScene extends Phaser.Scene {
     this.add.text(PX + 18, y, 'THE CHRONICLE', { fontFamily: FONT_H, fontSize: '13px', color: HEX.amber, fontStyle: '700', letterSpacing: 3 });
     this.logY = y + 22;
     this.logTexts = [];
+    slotTray(this, BX, BY + BH + 12, 8 * 72 + 12, 68, { sockets: [...Array(8).keys()].map((i) => BX + 42 + i * 72) }).forEach((o) => o.setDepth(89));
     this.actionBar = this.add.container(0, 0).setDepth(90);
-    this.endBtn = makeButton(this, BX + BW - 72, BY + BH + 46, 144, 52, 'END PHASE', () => this.endPartyPhase(), {
-      size: 15, fill: 0x2a1c0c, stroke: C.amber, sub: 'press E', onHover: (o) => this.hint(o ? 'Let the enemies act. Unused moves and actions are lost.' : ''),
+    this.endBtn = makeSlot(this, BX + BW - 76, BY + BH + 46, 152, 58, () => this.endPartyPhase(), {
+      title: 'END PHASE', sub: 'press E', accent: C.amber, size: 17, onHover: (o) => this.hint(o ? 'Let the enemies act. Unused moves and actions are lost.' : ''),
     }).setDepth(90);
   }
   toggleMute() { const m = musicPlayer.toggleMute(); this.muteIcon.setTexture(m ? 'ic_mute' : 'ic_sound'); }
@@ -694,23 +699,22 @@ export default class BattleScene extends Phaser.Scene {
     const acts = ['move', ...R.heroActions(this.s, u)];
     acts.slice(0, 8).forEach((id, i) => {
       const sk = id === 'move' ? { name: 'Move', desc: `Walk up to ${u.move} tiles. Shallow water and climbing cost 2.` } : SKILLS[id];
-      const x = BX + 42 + i * 78, y = BY + BH + 46;
+      const x = BX + 42 + i * 72, y = BY + BH + 46;
       const cdLeft = id !== 'move' && sk.cd ? R.cooldownOf(u, id) : 0;
       const enabled = id === 'move' ? !u.moved : !u.acted && (id === 'item' || R.skillTargets(this.s, u, id).length > 0);
-      const b = makeButton(this, x, y, 74, 56, '', () => this.chooseAction(id), {
+      const b = makeSlot(this, x, y, 66, 58, () => this.chooseAction(id), {
+        icon: `ic_${id === 'move' ? 'move' : sk.icon}`, label: sk.name, accent: sk.cd ? C.amber : 0x8a6d44,
         onHover: (o) => this.hint(o ? `${sk.name}: ${sk.desc}${cdLeft ? (cdLeft >= 99 ? '  (Used this fight.)' : `  (Ready in ${cdLeft} round${cdLeft > 1 ? 's' : ''}.)`) : ''}` : ''),
       });
-      const icon = this.add.image(0, -9, `ic_${id === 'move' ? 'move' : sk.icon}`).setScale(0.75);
-      const lbl = this.add.text(0, 17, sk.name.toUpperCase(), { fontFamily: FONT_H, fontSize: '11px', color: HEX.bone, fontStyle: '700', align: 'center' }).setOrigin(0.5);
-      if (lbl.width > 68) lbl.setScale(68 / lbl.width);
-      b.add([icon, lbl]);
       if (sk.cd) {
-        // signature abilities: a gold corner gem, and a countdown while they recharge
+        // signature abilities: a gem set into the top of the frame, and a countdown while they recharge
         const gem = this.add.graphics();
-        gem.fillStyle(cdLeft ? 0x3a4442 : C.amberHot, 1); gem.fillPoints([{ x: 30, y: -27 }, { x: 36, y: -21 }, { x: 30, y: -15 }, { x: 24, y: -21 }], true);
+        gem.fillStyle(0x050b0c, 1); gem.fillPoints([{ x: 0, y: -37 }, { x: 9, y: -28 }, { x: 0, y: -19 }, { x: -9, y: -28 }], true);
+        gem.fillStyle(cdLeft ? 0x3a4442 : C.amberHot, 1); gem.fillPoints([{ x: 0, y: -34 }, { x: 6, y: -28 }, { x: 0, y: -22 }, { x: -6, y: -28 }], true);
+        if (!cdLeft) { gem.fillStyle(0xffffff, 0.7); gem.fillRect(-2, -31, 2, 2); }
         b.add(gem);
-        if (cdLeft) b.add(this.add.text(0, -9, cdLeft >= 99 ? 'USED' : String(cdLeft), { fontFamily: FONT_H, fontSize: cdLeft >= 99 ? '13px' : '22px', color: HEX.bone, fontStyle: '900', stroke: '#050b0c', strokeThickness: 5 }).setOrigin(0.5));
-        else this.tweens.add({ targets: icon, scale: 0.86, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
+        if (cdLeft) b.add(this.add.text(0, -8, cdLeft >= 99 ? 'USED' : String(cdLeft), { fontFamily: FONT_H, fontSize: cdLeft >= 99 ? '13px' : '22px', color: HEX.bone, fontStyle: '900', stroke: '#050b0c', strokeThickness: 5 }).setOrigin(0.5));
+        else { const glint = this.add.image(0, -28, 'glow').setScale(0.12).setTint(C.amberHot).setBlendMode('ADD'); b.addAt(glint, b.list.indexOf(gem)); this.tweens.add({ targets: glint, alpha: 0.2, scale: 0.18, duration: 800, yoyo: true, repeat: -1, ease: 'Sine.InOut' }); }
       }
       b.setEnabled(enabled && (!this.tut || this.tut.isFree() || id === 'move' ? true : this.tut.allowSkill(id)));
       if (this.ui === 'move' && id === 'move') b.setOn(true);
@@ -1242,7 +1246,7 @@ export default class BattleScene extends Phaser.Scene {
     const silver = this.silver(8 + R.die(this.rng, 10));
     floatText(this, this.tx(ch.x), this.ty(ch.y) - 30, `+${silver} silver`, '#c9d4d2', { size: 16 });
     await this.wait(300);
-    const ids = R.rollLoot(this.run, R.runRng(this.run), { count: 3, minRarity: 'blessed' });
+    const ids = R.rollLoot(this.run, R.runRng(this.run), { count: R.hasRelic(this.run, 'r_magpie') ? 4 : 3, minRarity: 'blessed' });
     await this.lootModal(ids, 'A Reliquary', 'The drowned kept this for someone. Choose one.');
   }
   lootModal(ids, title, subtitle) {
@@ -1379,6 +1383,17 @@ export default class BattleScene extends Phaser.Scene {
     switch (it.use) {
       case 'salts': this.addDread(target, -30); sfx.chime(); this.fx.dread.explode(20, this.tx(target.x), this.ty(target.y)); break;
       case 'bandage': target.hp = Math.min(target.maxHp, target.hp + 10); sfx.equip(); floatText(this, this.tx(target.x), this.ty(target.y) - 20, '+10', '#8fdf93', { size: 20 }); break;
+      case 'ash':
+        target.ward = (target.ward ?? 0) + 8; sfx.resolve();
+        FX.shieldDome(this, this.tx(target.x), this.ty(target.y), 0xd9cfb8);
+        this.fx.smoke.explode(14, this.tx(target.x), this.ty(target.y));
+        floatText(this, this.tx(target.x), this.ty(target.y) - 30, 'WARD 8', HEX.bone, { size: 18 });
+        this.refreshAll(); break;
+      case 'whet':
+        target.mods = { ...target.mods, dmg: (target.mods.dmg ?? 0) + 3 }; sfx.equip();
+        this.fx.spark.explode(24, this.tx(target.x), this.ty(target.y) - 10);
+        floatText(this, this.tx(target.x), this.ty(target.y) - 30, '+3 DAMAGE', HEX.amberHot, { size: 18 });
+        break;
       case 'holy': target.flaw = null; this.addDread(target, -20); sfx.resolve(); this.fx.gold.explode(20, this.tx(target.x), this.ty(target.y)); break;
       case 'flare': this.s.flare = true; sfx.kindle(); this.cameras.main.flash(300, 255, 230, 180); this.refreshAll(); this.log('Phosphor light floods the chapel. Nothing can hide.', HEX.amberHot); break;
       case 'oil': {
@@ -2311,8 +2326,8 @@ export default class BattleScene extends Phaser.Scene {
     const up = run.meta ?? {};
     let ids;
     if (run.firstLoot && up.ossuary) ids = R.rollLoot(run, R.runRng(run), { count: 3, only: 'relic' });
-    else if (elite) ids = [...R.rollLoot(run, R.runRng(run), { count: 1, kinds: ['relic'], only: 'relic' }), ...R.rollLoot(run, R.runRng(run), { count: (up.ossuary ?? 0) >= 2 ? 3 : 2, minRarity: 'blessed' })];
-    else ids = R.rollLoot(run, R.runRng(run), { count: 3 });
+    else if (elite) ids = [...R.rollLoot(run, R.runRng(run), { count: R.hasRelic(run, 'r_reliquary') ? 2 : 1, kinds: ['relic'], only: 'relic' }), ...R.rollLoot(run, R.runRng(run), { count: (up.ossuary ?? 0) >= 2 ? 3 : 2, minRarity: 'blessed' })];
+    else ids = R.rollLoot(run, R.runRng(run), { count: R.hasRelic(run, 'r_magpie') ? 4 : 3 });
     run.firstLoot = false;
     await this.lootModal([...new Set(ids)], elite ? 'Elite Spoils' : 'Spoils', elite ? 'A Relic, and more. Choose one.' : 'Choose one.');
     if (elite && !this.tut) {

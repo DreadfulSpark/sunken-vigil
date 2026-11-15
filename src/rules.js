@@ -64,6 +64,41 @@ export function heroMods(h) {
   return m;
 }
 export const hasRelic = (run, id) => run.relics.includes(id);
+
+// ---------- Resonances: gear that shares a theme strengthens the whole party ----------
+export const RESONANCES = {
+  drown: { name: 'Undertow', color: 0x6fc2b5, hex: '#6fc2b5', tiers: [
+    { n: 2, mods: { slam: 2 }, text: 'Every hero: wall slams deal +2.' },
+    { n: 3, mods: { shove: 1 }, text: 'Every hero: shoves go 1 tile further.' }] },
+  mark: { name: 'Litany of Names', color: 0xffd27a, hex: '#ffd27a', tiers: [
+    { n: 2, mods: { markDmg: 2 }, text: 'Every hero: +2 damage against Marked foes.' },
+    { n: 3, mods: { atk: 1, markLong: 1 }, text: 'Every hero: +1 to hit, and Marks last a round longer.' }] },
+  bell: { name: 'Carillon', color: 0xe0b070, hex: '#e0b070', tiers: [
+    { n: 2, mods: { dazedVuln: 2 }, text: 'Dazed foes take +2 damage from every hero.' },
+    { n: 3, mods: { saveBonus: 2, chimeBonus: 2, tollDc: 1 }, text: 'Every hero: +2 to Dread saves. Chime heals +2, Toll DC +1.' }] },
+  dark: { name: 'Nightward', color: 0xb08ad0, hex: '#c8a0ff', tiers: [
+    { n: 2, mods: { darkDmg: 2 }, text: 'Every hero: +2 damage to foes standing in darkness.' },
+    { n: 3, mods: { darkSight: 1, dreadMul: -0.15 }, text: 'Every hero sees into darkness and gains 15% less Dread.' }] },
+};
+export function tagCounts(run) {
+  const n = { drown: 0, mark: 0, bell: 0, dark: 0 };
+  const ids = [...run.relics, ...run.heroes.filter((h) => !h.lost).flatMap((h) => [h.weapon, h.charm])];
+  for (const id of ids) { const t = id && itemById(id)?.tag; if (t) n[t]++; }
+  return n;
+}
+export function activeResonances(run) {
+  const n = tagCounts(run), out = [];
+  for (const [tag, r] of Object.entries(RESONANCES)) {
+    const tiers = r.tiers.filter((t) => n[tag] >= t.n);
+    if (tiers.length) out.push({ tag, name: r.name, hex: r.hex, count: n[tag], level: tiers.length, tiers });
+  }
+  return out;
+}
+export function resonanceMods(run) {
+  const m = {};
+  for (const a of activeResonances(run)) for (const t of a.tiers) for (const [k, v] of Object.entries(t.mods)) m[k] = (m[k] ?? 0) + v;
+  return m;
+}
 export const maxHpOf = (h) => HEROES[h.id].hp + (heroMods(h).maxHp ?? 0) - (h.scars ?? 0) * 2;
 export const satchelCap = (run) => 3 + (hasRelic(run, 'r_oilskin') ? 1 : 0) + ((run.meta?.reliquary ?? 0) >= 2 ? 1 : 0);
 export const partyHeroes = (run) => run.heroes.filter((h) => !h.lost);
@@ -218,6 +253,7 @@ export function computeEmbers(run, won) {
 function makeHeroUnit(run, h) {
   const def = HEROES[h.id];
   const m = heroMods(h);
+  for (const [k, v] of Object.entries(resonanceMods(run))) m[k] = (m[k] ?? 0) + v;
   const flaw = h.flaw;
   return {
     id: h.id, side: 'hero', kind: h.id, name: def.name, cls: def.cls, x: 0, y: 0,

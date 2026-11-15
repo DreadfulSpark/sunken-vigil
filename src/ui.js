@@ -327,6 +327,15 @@ export function makeItemCard(scene, x, y, item, rarityDef, opts = {}) {
     fontFamily: FONT_B, fontSize: '12px', color: HEX.boneDim, align: 'center', wordWrap: { width: w - 28 },
   }).setOrigin(0.5, 1);
   c.add([shadow, stone, g, rays, halo, icon, banner, name, sub, body, foot]);
+  if (opts.tagLine) {
+    // the Resonance this item feeds, in that Resonance's colour; it pulses if taking it awakens a tier
+    const tl = scene.add.text(0, h / 2 - (opts.foot ? 32 : 14), opts.tagLine.text, {
+      fontFamily: FONT_H, fontSize: '11px', color: opts.tagLine.hex, fontStyle: '700', letterSpacing: 1, stroke: '#050b0c', strokeThickness: 3,
+    }).setOrigin(0.5, 1);
+    if (tl.width > w - 20) tl.setScale((w - 20) / tl.width);
+    c.add(tl);
+    if (opts.tagLine.hot) scene.tweens.add({ targets: tl, alpha: 0.45, duration: 650, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
+  }
   scene.tweens.add({ targets: icon, y: icon.y - 5, duration: 1500, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
   scene.tweens.add({ targets: rays, alpha: 0.3, scale: 0.85, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
   if (item.rarity === 'relic') {
@@ -383,4 +392,115 @@ export function floatText(scene, x, y, str, color, { size = 22, rise = 46, dur =
   scene.tweens.add({ targets: t, scale: 1, alpha: 1, duration: 160, delay, ease: 'Back.Out' });
   scene.tweens.add({ targets: t, y: y - rise, alpha: 0, duration: dur, delay: delay + 260, ease: 'Quad.In', onComplete: () => t.destroy() });
   return t;
+}
+
+// An action slot carved like the loot reliquaries: a stone tile in a bevelled bronze frame with
+// riveted corners, the icon lit in a dark niche, the name on a dark plate. opts: { icon, label,
+// title, sub, accent, onHover, size }. With `title` instead of `icon` it is a carved text button.
+export function makeSlot(scene, x, y, w, h, onClick, opts = {}) {
+  const c = scene.add.container(x, y);
+  const accent = opts.accent ?? 0x9a7a48;
+  const L = -w / 2, Tp = -h / 2;
+  // long names wrap onto a taller two-line plate instead of shrinking to nothing
+  const twoLine = !!opts.icon && (opts.label ?? '').length > 11 && (opts.label ?? '').includes(' ');
+  const plateH = opts.icon ? (twoLine ? 24 : 17) : 0;
+  const shadow = scene.add.rectangle(3, 5, w, h, 0x000000, 0.55);
+  const stone = scene.add.tileSprite(0, 0, w, h, 'px_walld0').setTint(0x46504d);
+  const g = scene.add.graphics();
+  const glow = scene.add.image(0, opts.icon ? -8 : 0, 'glow').setScale(opts.icon ? 0.3 : 0.6).setTint(accent).setAlpha(0).setBlendMode('ADD');
+  c.add([shadow, stone, g, glow]);
+  let icon = null, label = null, title = null, sub = null;
+  if (opts.icon) {
+    icon = scene.add.image(0, twoLine ? -11 : -8, opts.icon).setScale(twoLine ? 0.6 : 0.7);
+    label = scene.add.text(0, h / 2 - 4 - plateH / 2, (opts.label ?? '').toUpperCase(), {
+      fontFamily: FONT_H, fontSize: twoLine ? '10px' : '11px', color: HEX.bone, fontStyle: '700', align: 'center',
+      wordWrap: twoLine ? { width: w - 10 } : undefined, lineSpacing: -3,
+    }).setOrigin(0.5);
+    if (label.width > w - 12) label.setScale((w - 12) / label.width);
+    icon.baseScale = icon.scale;
+    c.add([icon, label]);
+  } else {
+    title = scene.add.text(0, opts.sub ? -7 : 0, opts.title ?? '', {
+      fontFamily: FONT_H, fontSize: `${opts.size ?? 16}px`, color: HEX.amberHot, fontStyle: '900', letterSpacing: 2, stroke: '#050b0c', strokeThickness: 4,
+    }).setOrigin(0.5);
+    sub = scene.add.text(0, 13, opts.sub ?? '', { fontFamily: FONT_B, fontSize: '12px', color: HEX.boneDim, fontStyle: 'italic' }).setOrigin(0.5);
+    c.add([title, sub]);
+  }
+  c.enabled = true; c.on_ = false;
+  const draw = (hover) => {
+    g.clear();
+    const lit = (hover && c.enabled) || c.on_;
+    const band = !c.enabled ? 0x55524a : lit ? C.amberHot : accent;
+    // the niche the icon sits in, darker at the bottom
+    if (opts.icon) {
+      g.fillStyle(0x030708, c.enabled ? 0.6 : 0.78); g.fillRect(L + 8, Tp + 8, w - 16, h - 16 - plateH);
+      g.fillGradientStyle(0x000000, 0x000000, 0x000000, 0x000000, 0, 0, 0.5, 0.5); g.fillRect(L + 8, Tp + 8, w - 16, h - 16 - plateH);
+      // nameplate
+      g.fillStyle(0x050b0c, 0.96); g.fillRect(L + 4, h / 2 - 4 - plateH, w - 8, plateH);
+      g.fillStyle(band, lit ? 0.6 : 0.3); g.fillRect(L + 4, h / 2 - 4 - plateH, w - 8, 1);
+    } else {
+      g.fillGradientStyle(0x2a1c0c, 0x2a1c0c, 0x050b0c, 0x050b0c, 0.55, 0.55, 0.8, 0.8); g.fillRect(L + 6, Tp + 6, w - 12, h - 12);
+    }
+    if (c.on_) { g.fillStyle(C.amber, 0.16); g.fillRect(L + 4, Tp + 4, w - 8, h - 8); }
+    // bevelled frame: dark outer edge, metal band, pin-line
+    g.lineStyle(4, 0x050b0c, 1); g.strokeRect(L, Tp, w, h);
+    g.lineStyle(2, band, lit ? 1 : 0.85); g.strokeRect(L + 3, Tp + 3, w - 6, h - 6);
+    g.lineStyle(1, 0xffffff, lit ? 0.3 : 0.1); g.strokeRect(L + 6, Tp + 6, w - 12, h - 12);
+    // riveted corners
+    for (const [cx, cy] of [[L + 4, Tp + 4], [-L - 4, Tp + 4], [L + 4, -Tp - 4], [-L - 4, -Tp - 4]]) {
+      g.fillStyle(0x050b0c, 1); g.fillRect(cx - 5, cy - 5, 10, 10);
+      g.fillStyle(band, 1); g.fillPoints([{ x: cx, y: cy - 4 }, { x: cx + 4, y: cy }, { x: cx, y: cy + 4 }, { x: cx - 4, y: cy }], true);
+    }
+    glow.setAlpha(lit ? 0.4 : 0);
+  };
+  const zone = scene.add.zone(0, 0, w, h).setInteractive({ useHandCursor: true });
+  c.add(zone);
+  zone.on('pointerover', () => {
+    opts.onHover?.(true);
+    if (!c.enabled) return;
+    draw(true); sfx.hover();
+    scene.tweens.add({ targets: c, y: y - 3, duration: 90, ease: 'Quad.Out' });
+    if (icon) scene.tweens.add({ targets: icon, scale: icon.baseScale * 1.14, duration: 90 });
+  });
+  zone.on('pointerout', () => {
+    opts.onHover?.(false);
+    draw(false);
+    scene.tweens.add({ targets: c, y, duration: 90, ease: 'Quad.Out' });
+    if (icon) scene.tweens.add({ targets: icon, scale: icon.baseScale, duration: 90 });
+  });
+  zone.on('pointerdown', (p, lx, ly, ev) => {
+    ev?.stopPropagation?.();
+    if (!c.enabled) return;
+    scene.tweens.add({ targets: c, scale: 0.93, duration: 60, yoyo: true });
+    sfx.click();
+    onClick();
+  });
+  c.isUi = true; c.zone = zone; c.icon = icon;
+  c.setEnabled = (v) => {
+    c.enabled = v;
+    stone.setTint(v ? 0x46504d : 0x323836);
+    icon?.setAlpha(v ? 1 : 0.5); label?.setAlpha(v ? 1 : 0.62); title?.setAlpha(v ? 1 : 0.5);
+    draw(false); return c;
+  };
+  c.setOn = (v) => { c.on_ = v; draw(false); return c; };
+  c.setLabel = (s, subText) => { title?.setText(s); if (subText !== undefined) sub?.setText(subText); return c; };
+  draw(false);
+  return c;
+}
+
+// The stone ledge the action slots sit on.
+export function slotTray(scene, x, y, w, h, opts = {}) {
+  const stone = scene.add.tileSprite(x + w / 2, y + h / 2, w, h, 'px_walld0').setTint(0x232b2a);
+  const g = scene.add.graphics();
+  g.fillGradientStyle(0x000000, 0x000000, 0x000000, 0x000000, 0.45, 0.45, 0.15, 0.15); g.fillRect(x, y, w, h);
+  g.lineStyle(4, 0x050b0c, 1); g.strokeRect(x, y, w, h);
+  g.lineStyle(2, 0x5a4a30, 0.9); g.strokeRect(x + 3, y + 3, w - 6, h - 6);
+  g.lineStyle(1, 0xffffff, 0.06); g.lineBetween(x + 6, y + 6, x + w - 6, y + 6);
+  // empty carved sockets, so unused slots read as part of the altar rather than a gap
+  for (const sx of opts.sockets ?? []) {
+    g.fillStyle(0x020506, 0.75); g.fillRect(sx - 30, y + h / 2 - 26, 60, 52);
+    g.lineStyle(1, 0x5a4a30, 0.45); g.strokeRect(sx - 30, y + h / 2 - 26, 60, 52);
+    g.fillStyle(0x5a4a30, 0.5); g.fillPoints([{ x: sx, y: y + h / 2 - 5 }, { x: sx + 5, y: y + h / 2 }, { x: sx, y: y + h / 2 + 5 }, { x: sx - 5, y: y + h / 2 }], true);
+  }
+  return [stone, g];
 }

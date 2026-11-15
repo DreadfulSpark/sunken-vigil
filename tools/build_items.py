@@ -214,6 +214,7 @@ DRAWN = {
     'lastbell': bell((80, 84, 88), ember=True), 'teethbell': bell((200, 188, 160), teeth=True),
     'r_bell': bell((222, 170, 70)), 'r_silence': bell((110, 120, 124), crack=True),
     'thimble': thimble(), 'pearl': black_pearl(), 'r_wick': candle_stub((110, 190, 255, 255), (230, 245, 255, 255)), 'gamblerdie': die(), 'rope': rope(), 'candle': candle_stub(),
+    'b_sanctus': bell((214, 206, 180)), 'b_deepbell': bell((52, 64, 84), teeth=True),
     'r_hourglass': hourglass(), 'r_coin': coin(), 'r_oilskin': satchel(), 'c_bandage': bandage(), 'r_tongue': tongue(),
 }
 
@@ -231,6 +232,13 @@ PICK = {
     'r_moth': I + 'misc/misc_phial.png',
     'c_salts': I + 'potion/cloudy.png', 'c_oil': I + 'potion/brown_new.png', 'c_holy': I + 'potion/brilliant_blue_new.png',
     'c_flare': I + 'potion/golden.png',
+    # v3.7
+    'w_lockhammer': I + 'weapon/lucern_hammer.png', 'w_gatechain': I + 'weapon/dire_flail_1.png',
+    's_index': I + 'book/dark_gray_new.png', 's_atlas': I + 'book/metal_cyan_new.png',
+    'ch_key': I + 'misc/key.png', 'ch_signet': I + 'ring/plain_black.png', 'ch_clapper': I + 'amulet/cylinder_gray.png',
+    'ch_mask': I + 'armor/headgear/green_mask.png', 'ch_scale': I + 'amulet/stone_1_cyan.png', 'ch_coral': I + 'ring/coral.png',
+    'r_magpie': I + 'misc/misc_box.png', 'r_reliquary': I + 'misc/misc_crystal_new.png', 'r_salvage': I + 'scroll/scroll-brown.png',
+    'c_ash': I + 'potion/silver.png', 'c_whet': I + 'misc/misc_stone_inert.png',
 }
 n = 0
 for k, im in DRAWN.items():
