@@ -1,7 +1,7 @@
 // Pick-one-of-N overlays: loot (battles, chests, events, vaults) and talents (elites, sanctuaries).
 import { RARITY, HEROES, TALENTS, itemById } from './data.js';
 import { equipItem, satchelCap, partyHeroes, talentChoices, learnTalent, runRng } from './rules.js';
-import { makeItemCard, makeButton, FONT_H, FONT_B, HEX, C } from './ui.js';
+import { makeItemCard, makeCardBack, makeButton, FONT_H, FONT_B, HEX, C } from './ui.js';
 import { unitKey } from './sprites.js';
 import { sfx } from './audio.js';
 
@@ -96,12 +96,24 @@ export function showLootChoice(scene, run, ids, { title = 'Spoils', subtitle = '
     finish(card);
   };
   items.forEach((it, i) => {
-    const card = makeItemCard(scene, x0 + i * gap, H / 2 + 24, it, RARITY[it.rarity], { foot: compareText(run, it), onPick: (c) => take(c) });
+    const x = x0 + i * gap, y = H / 2 + 34;
+    const card = makeItemCard(scene, x, y, it, RARITY[it.rarity], { foot: compareText(run, it), onPick: (c) => take(c) });
     card.item = it;
-    card.scaleX = 0; card.alpha = 0;
-    scene.tweens.add({ targets: card, scaleX: 1, alpha: 1, duration: 320, delay: 300 + i * 140, ease: 'Back.Out', onStart: () => sfx.page() });
-    if (it.rarity === 'relic' || it.rarity === 'cursed') scene.time.delayedCall(300 + i * 140, () => sfx.loot(it.rarity));
-    root.add(card);
+    card.locked = true; card.setVisible(false);
+    // dealt face down, then each card turns over in turn with a flash in its rarity colour
+    const back = makeCardBack(scene, x, y - 60, { color: RARITY[it.rarity].color });
+    back.alpha = 0;
+    root.add([back, card]);
+    const t0 = 250 + i * 170;
+    scene.tweens.add({ targets: back, y, alpha: 1, duration: 260, delay: t0, ease: 'Quad.Out', onStart: () => sfx.page() });
+    scene.tweens.add({ targets: back, scaleX: 0, duration: 140, delay: t0 + 480 + i * 80, ease: 'Quad.In', onComplete: () => {
+      back.destroy();
+      card.setVisible(true); card.scaleX = 0;
+      scene.tweens.add({ targets: card, scaleX: 1, duration: 180, ease: 'Back.Out', onComplete: () => { if (!done) card.locked = false; } });
+      const fl = scene.add.rectangle(x, y, card.cardW, card.cardH, RARITY[it.rarity].color, 0.6).setBlendMode('ADD').setDepth(depth + 4);
+      scene.tweens.add({ targets: fl, alpha: 0, duration: 380, onComplete: () => fl.destroy() });
+      if (it.rarity === 'relic' || it.rarity === 'cursed') { sfx.loot(it.rarity); scene.cameras.main.shake(120, 0.003); } else sfx.coin();
+    } });
     cards.push(card);
   });
   skip = makeButton(scene, W / 2, H - 46, 260, 44, skipSilver ? `Take nothing (+${skipSilver} Silver)` : 'Take nothing', () => {

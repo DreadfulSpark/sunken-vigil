@@ -31,4 +31,5 @@ The first time you play, a short guided fight teaches everything.
 | `tools/` | Scripts that rebuild `assets/` from the source packs |
 | `docs/` | Design research, critic responses and the look and sound pass |
 
-Asset credits and licences are in [CREDITS.md](CREDITS.md).
+## License
+The code is under the [MIT License](LICENSE). Third-party art, sound and music keep their own CC0, public-domain or MIT licences, listed in [CREDITS.md](CREDITS.md).

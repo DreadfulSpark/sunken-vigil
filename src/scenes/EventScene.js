@@ -281,9 +281,9 @@ export default class EventScene extends Phaser.Scene {
     this.stock.forEach((st, i) => {
       const it = itemById(st.id);
       const price = R.itemPrice(it);
-      const x = 560 + (i % 3) * 230, y = i < 3 ? 368 : 590;
+      const x = 560 + (i % 3) * 230, y = i < 3 ? 354 : 594;
       const card = makeItemCard(this, x, y, it, RARITY[it.rarity], {
-        w: 210, h: i < 3 ? 250 : 190,
+        w: 210, h: i < 3 ? 226 : 206,
         foot: st.sold ? 'SOLD' : `${price} silver${run.silver < price ? ' (not enough)' : ''}`,
         disabled: () => st.sold || run.silver < price,
         onPick: () => this.buy(st, it, price),

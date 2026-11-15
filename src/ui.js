@@ -264,45 +264,115 @@ export function panel(scene, x, y, w, h, { fill = C.panel, alpha = 0.94, stroke 
 
 export const SLOT_LABEL = { weapon: 'Weapon', charm: 'Charm', relic: 'Party Relic', consumable: 'Consumable' };
 
-// A loot / shop card. opts: { w, h, sub (string under rarity), foot (string at bottom), onPick, disabled }
+// A loot / shop card, styled as a reliquary: carved stone, a bevelled frame in the rarity
+// colour, the item lit in an arched niche on a pedestal. Relics shimmer, cursed things
+// smoulder, blessed things glimmer. opts: { w, h, sub, foot, onPick, disabled }
 export function makeItemCard(scene, x, y, item, rarityDef, opts = {}) {
-  const w = opts.w ?? 220, h = opts.h ?? 270;
+  const w = opts.w ?? 220, h = opts.h ?? 290;
   const c = scene.add.container(x, y);
-  const g = scene.add.graphics();
   const col = rarityDef.color;
+  const L = -w / 2, Tp = -h / 2;
+  const compact = h < 260;
+  const nicheH = compact ? 74 : 118, AR = compact ? 36 : 58, AY = Tp + (compact ? 42 : 52), IY = Tp + (compact ? 56 : 78);
+  const shadow = scene.add.rectangle(5, 9, w, h, 0x000000, 0.55);
+  const stone = scene.add.tileSprite(0, 0, w, h, 'px_walld0').setTint(0x48524f);
+  const g = scene.add.graphics();
   const draw = (hover) => {
     g.clear();
-    g.fillStyle(0x000000, 0.5); g.fillRoundedRect(-w / 2 + 4, -h / 2 + 8, w, h, 14);
-    g.fillStyle(0x0d1819, 1); g.fillRoundedRect(-w / 2, -h / 2, w, h, 14);
-    g.fillStyle(col, hover ? 0.2 : 0.11); g.fillRoundedRect(-w / 2, -h / 2, w, 92, { tl: 14, tr: 14, bl: 0, br: 0 });
-    g.lineStyle(hover ? 3 : 2, col, 1); g.strokeRoundedRect(-w / 2, -h / 2, w, h, 14);
-    g.lineStyle(1, col, 0.35); g.strokeRoundedRect(-w / 2 + 6, -h / 2 + 6, w - 12, h - 12, 10);
+    // darker toward the bottom so the text sits on calm ground
+    g.fillGradientStyle(0x060c0d, 0x060c0d, 0x060c0d, 0x060c0d, 0.3, 0.3, 0.9, 0.9); g.fillRect(L, Tp + nicheH - 10, w, h - nicheH + 10);
+    // the niche: a dark arch the item floats in
+    g.fillStyle(0x030708, 0.92);
+    g.fillRect(-AR, AY, AR * 2, Tp + nicheH + 18 - AY); g.fillCircle(0, AY, AR);
+    g.lineStyle(2, col, hover ? 0.9 : 0.55); g.beginPath(); g.arc(0, AY, AR + 2, Math.PI, 0); g.strokePath();
+    g.lineBetween(-AR - 2, AY, -AR - 2, Tp + nicheH + 18); g.lineBetween(AR + 2, AY, AR + 2, Tp + nicheH + 18);
+    // pedestal
+    g.fillStyle(0x5b6663, 1); g.fillRect(-34, Tp + nicheH + 6, 68, 8);
+    g.fillStyle(0x3a4442, 1); g.fillRect(-28, Tp + nicheH + 14, 56, 6);
+    g.fillStyle(0xffffff, 0.14); g.fillRect(-34, Tp + nicheH + 6, 68, 2);
+    // bevelled frame: dark outer, rarity band, bright pin-line, riveted corners
+    g.lineStyle(4, 0x050b0c, 1); g.strokeRect(L, Tp, w, h);
+    g.lineStyle(3, col, hover ? 1 : 0.85); g.strokeRect(L + 3, Tp + 3, w - 6, h - 6);
+    g.lineStyle(1, 0xffffff, hover ? 0.35 : 0.16); g.strokeRect(L + 7, Tp + 7, w - 14, h - 14);
+    for (const [cx, cy] of [[L + 5, Tp + 5], [-L - 5, Tp + 5], [L + 5, -Tp - 5], [-L - 5, -Tp - 5]]) {
+      g.fillStyle(0x050b0c, 1); g.fillRect(cx - 7, cy - 7, 14, 14);
+      g.fillStyle(col, 1); g.fillPoints([{ x: cx, y: cy - 6 }, { x: cx + 6, y: cy }, { x: cx, y: cy + 6 }, { x: cx - 6, y: cy }], true);
+      g.fillStyle(0xffffff, 0.6); g.fillRect(cx - 1, cy - 3, 2, 2);
+    }
+    // rarity banner across the top edge
+    g.fillStyle(0x050b0c, 1); g.fillRect(-56, Tp - 11, 112, 22);
+    g.fillTriangle(-56, Tp - 11, -66, Tp, -56, Tp + 11); g.fillTriangle(56, Tp - 11, 66, Tp, 56, Tp + 11);
+    g.fillStyle(col, 1); g.fillRect(-53, Tp - 8, 106, 16);
+    g.fillStyle(0xffffff, 0.28); g.fillRect(-53, Tp - 8, 106, 3);
   };
   draw(false);
-  const glow = scene.add.image(0, -h / 2 + 50, 'glow').setScale(0.42).setTint(col).setAlpha(0.5).setBlendMode('ADD');
-  const icon = scene.add.image(0, -h / 2 + 48, `it_${item.icon ?? item.slot}`).setTint(col).setScale(1.1);
-  const name = scene.add.text(0, -h / 2 + 100, item.name, {
-    fontFamily: FONT_H, fontSize: '17px', color: rarityDef.hex, fontStyle: '700', align: 'center', wordWrap: { width: w - 24 },
+  const rays = scene.add.image(0, IY - 2, 'glow').setScale(compact ? 0.5 : 0.75).setTint(col).setAlpha(0.55).setBlendMode('ADD');
+  const halo = scene.add.image(0, IY - 2, 'glow').setScale(0.38).setTint(0xffffff).setAlpha(0.16).setBlendMode('ADD');
+  const iconKey = scene.textures.exists(`px_it_${item.id}`) ? `px_it_${item.id}` : `it_${item.icon ?? item.slot}`;
+  const icon = scene.add.image(0, IY, iconKey).setScale(compact ? 0.62 : 1);
+  if (iconKey.startsWith('it_')) icon.setTint(col).setScale(compact ? 0.8 : 1.1);
+  const banner = scene.add.text(0, Tp, rarityDef.name.toUpperCase(), { fontFamily: FONT_H, fontSize: '12px', color: '#050b0c', fontStyle: '900', letterSpacing: 3 }).setOrigin(0.5);
+  const name = scene.add.text(0, Tp + nicheH + (compact ? 22 : 28), item.name, {
+    fontFamily: FONT_H, fontSize: '17px', color: rarityDef.hex, fontStyle: '700', align: 'center', wordWrap: { width: w - 28 },
+    stroke: '#050b0c', strokeThickness: 4,
   }).setOrigin(0.5, 0);
-  const sub = scene.add.text(0, name.y + name.height + 4, opts.sub ?? (item.slot === 'relic' && item.rarity === 'relic' ? 'Party Relic' : `${rarityDef.name} ${SLOT_LABEL[item.slot]}`), {
+  const sub = scene.add.text(0, name.y + name.height + 1, opts.sub ?? SLOT_LABEL[item.slot], {
     fontFamily: FONT_B, fontSize: '13px', color: HEX.boneDim, fontStyle: 'italic', align: 'center',
   }).setOrigin(0.5, 0);
-  const body = scene.add.text(0, sub.y + sub.height + 10, item.text, {
-    fontFamily: FONT_B, fontSize: '15px', color: HEX.bone, align: 'center', wordWrap: { width: w - 30 }, lineSpacing: 2,
+  if (compact && !opts.sub) sub.setVisible(false);
+  const body = scene.add.text(0, compact && !opts.sub ? name.y + name.height + 4 : sub.y + sub.height + 6, item.text, {
+    fontFamily: FONT_B, fontSize: compact ? '13px' : '14px', color: HEX.bone, align: 'center', wordWrap: { width: w - 32 }, lineSpacing: compact ? 0 : 1,
   }).setOrigin(0.5, 0);
-  const foot = scene.add.text(0, h / 2 - 16, opts.foot ?? '', {
-    fontFamily: FONT_B, fontSize: '12px', color: HEX.boneDim, align: 'center', wordWrap: { width: w - 24 },
+  const foot = scene.add.text(0, h / 2 - 14, opts.foot ?? '', {
+    fontFamily: FONT_B, fontSize: '12px', color: HEX.boneDim, align: 'center', wordWrap: { width: w - 28 },
   }).setOrigin(0.5, 1);
-  c.add([g, glow, icon, name, sub, body, foot]);
+  c.add([shadow, stone, g, rays, halo, icon, banner, name, sub, body, foot]);
+  scene.tweens.add({ targets: icon, y: icon.y - 5, duration: 1500, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
+  scene.tweens.add({ targets: rays, alpha: 0.3, scale: 0.85, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
+  if (item.rarity === 'relic') {
+    // a slow golden sheen sweeps the card, sparks rise off the relic
+    const sheen = scene.add.rectangle(L + 20, 0, 22, h - 12, 0xfff3c9, 0).setBlendMode('ADD');
+    c.add(sheen);
+    const sweep = () => {
+      if (!sheen.scene) return;
+      sheen.x = L + 20; sheen.setFillStyle(0xfff3c9, 0.14);
+      scene.tweens.add({ targets: sheen, x: -L - 20, duration: 800, ease: 'Quad.InOut', onComplete: () => { sheen.setFillStyle(0xfff3c9, 0); scene.time.delayedCall(1900, sweep); } });
+    };
+    scene.time.delayedCall(600, sweep);
+    c.add(scene.add.particles(0, IY - 2, 'spark', { x: { min: -40, max: 40 }, y: { min: -30, max: 30 }, lifespan: 900, scale: { start: 0.9, end: 0 }, alpha: { start: 1, end: 0 }, tint: [0xffd27a, 0xfff3c9], blendMode: 'ADD', frequency: 140, speedY: { min: -30, max: -10 } }));
+  } else if (item.rarity === 'cursed') {
+    // it smoulders and twitches
+    const smoke = scene.add.particles(0, IY + 34, 'smoke', { x: { min: -30, max: 30 }, lifespan: 1600, speedY: { min: -40, max: -18 }, scale: { start: 1.2, end: 3 }, alpha: { start: 0.5, end: 0 }, tint: 0x6a1010, frequency: 160 });
+    c.addAt(smoke, c.getIndex(icon));
+    scene.tweens.add({ targets: icon, angle: { from: -3, to: 3 }, duration: 70, yoyo: true, repeat: 3, loop: -1, loopDelay: 2200 });
+  } else if (item.rarity === 'blessed') {
+    c.add(scene.add.particles(0, IY - 2, 'mote', { x: { min: -50, max: 50 }, y: { min: -40, max: 40 }, lifespan: 1600, speedY: { min: -14, max: -4 }, alpha: { start: 0.9, end: 0 }, tint: col, blendMode: 'ADD', frequency: 180, scale: { min: 1, max: 2 } }));
+  }
   if (opts.onPick) {
     const z = scene.add.zone(0, 0, w, h).setInteractive({ useHandCursor: true });
     c.add(z);
-    z.on('pointerover', () => { if (c.locked) return; draw(true); scene.tweens.add({ targets: c, y: y - 10, scale: 1.03, duration: 140, ease: 'Quad.Out' }); sfx.hover(); });
-    z.on('pointerout', () => { if (c.locked) return; draw(false); scene.tweens.add({ targets: c, y, scale: 1, duration: 140, ease: 'Quad.Out' }); });
+    z.on('pointerover', () => { if (c.locked) return; draw(true); halo.setAlpha(0.35); scene.tweens.add({ targets: c, y: y - 12, scale: 1.04, duration: 140, ease: 'Quad.Out' }); sfx.hover(); });
+    z.on('pointerout', () => { if (c.locked) return; draw(false); halo.setAlpha(0.16); scene.tweens.add({ targets: c, y, scale: 1, duration: 140, ease: 'Quad.Out' }); });
     z.on('pointerdown', () => { if (c.locked || opts.disabled?.()) { sfx.denied(); return; } sfx.click(); opts.onPick(c); });
   }
-  scene.tweens.add({ targets: glow, alpha: 0.25, duration: 1200, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
   c.cardW = w; c.cardH = h;
+  return c;
+}
+
+// The face-down side shown before a loot card turns over.
+export function makeCardBack(scene, x, y, { w = 220, h = 290, color = 0xd9cfb8 } = {}) {
+  const c = scene.add.container(x, y);
+  const stone = scene.add.tileSprite(0, 0, w, h, 'px_walld1').setTint(0x3a4442);
+  const g = scene.add.graphics();
+  g.fillStyle(0x050b0c, 0.5); g.fillRect(-w / 2, -h / 2, w, h);
+  g.lineStyle(4, 0x050b0c, 1); g.strokeRect(-w / 2, -h / 2, w, h);
+  g.lineStyle(3, 0x7a6640, 1); g.strokeRect(-w / 2 + 3, -h / 2 + 3, w - 6, h - 6);
+  g.lineStyle(2, 0x9a8456, 0.85); g.strokeCircle(0, 0, 46); g.strokeCircle(0, 0, 30);
+  for (let i = 0; i < 8; i++) { const a = (i * Math.PI) / 4; g.lineBetween(Math.cos(a) * 30, Math.sin(a) * 30, Math.cos(a) * 46, Math.sin(a) * 46); }
+  g.fillStyle(0x9a8456, 1); g.fillPoints([{ x: 0, y: -12 }, { x: 8, y: 0 }, { x: 0, y: 12 }, { x: -8, y: 0 }], true);
+  const sigil = scene.add.image(0, 0, 'glow').setScale(0.55).setTint(color).setAlpha(0.4).setBlendMode('ADD');
+  c.add([scene.add.rectangle(5, 9, w, h, 0x000000, 0.55), stone, g, sigil]);
+  scene.tweens.add({ targets: sigil, alpha: 0.15, duration: 500, yoyo: true, repeat: -1 });
   return c;
 }
 

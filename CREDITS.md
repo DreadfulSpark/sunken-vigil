@@ -1,12 +1,13 @@
 # Credits
 
-The game code is original. Third-party assets come from the creators below. Everything listed is CC0 (public-domain dedication) or public domain. None of them requires attribution, but they are credited here anyway.
+The game code is original and MIT-licensed (see `LICENSE`). Third-party assets come from the creators below. Everything listed is CC0 (public-domain dedication) or public domain. None of them requires attribution, but they are credited here anyway.
 
 ## Art
 - **Dungeon Crawl Stone Soup 32x32 tiles**: the DCSS tile artists. CC0. https://opengameart.org/content/dungeon-crawl-32x32-tiles
   - The heroes are composited from its paper-doll layers.
   - All sprites are outlined, colour-graded and upscaled by `tools/build_sprites.py`.
-  - The pews and candles are new pixel art drawn in the same style.
+  - The pews, candles and several item icons (bells, anchor, die, hourglass, coin, rope, thimble, satchel, bandage, wick, black pearl, tongue) are new pixel art drawn in the same style by `tools/build_items.py`.
+  - The other item icons use DCSS item sprites.
 - ***Abbey in the Oakwood*** (1809–10): Caspar David Friedrich. Public domain, via Wikimedia Commons.
   - https://commons.wikimedia.org/wiki/File:Caspar_David_Friedrich_-_Abtei_im_Eichwald_-_Google_Art_Project.jpg
 
