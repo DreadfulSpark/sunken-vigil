@@ -6,6 +6,7 @@ import { showLootChoice, showTalentChoice } from '../loot.js';
 import { Tutorial } from '../tutorial.js';
 import { saveMeta } from '../save.js';
 import { unitKey } from '../sprites.js';
+import * as FX from '../battleFx.js';
 
 const Phaser = window.Phaser;
 const T = 60, BX = 34, BY = 92, BW = 13 * T, BH = 9 * T;
@@ -324,6 +325,7 @@ export default class BattleScene extends Phaser.Scene {
       brine: mk([0x7fb8ae, 0x2d6b6b, 0xd9cfb8], false, { gravityY: 260 }),
       gold: mk([0xffd27a, 0xfff3c9, 0xe8a33d], true, { speed: { min: 120, max: 420 }, lifespan: { min: 500, max: 1100 }, scale: { start: 1.8, end: 0 } }),
       dread: mk([0x7fb8ae, 0x3a6b66], true, { speed: { min: 20, max: 80 }, lifespan: 1000, gravityY: -60 }),
+      dust: this.add.particles(0, 0, 'smoke', { speed: { min: 8, max: 34 }, angle: { min: 180, max: 360 }, lifespan: 420, scale: { start: 0.5, end: 1.3 }, alpha: { start: 0.35, end: 0 }, tint: 0x8a8272, emitting: false }).setDepth(33),
       smoke: this.add.particles(0, 0, 'smoke', { speed: { min: 10, max: 50 }, lifespan: 1200, scale: { start: 1.5, end: 4 }, alpha: { start: 0.5, end: 0 }, tint: 0x3b4241, emitting: false, gravityY: -30 }).setDepth(49),
       fire: mk([0xff7a2a, 0xffd27a, 0xc0501c], true, { speed: { min: 40, max: 200 }, lifespan: { min: 500, max: 1000 }, gravityY: -120, scale: { start: 2, end: 0 } }),
     };
@@ -355,7 +357,7 @@ export default class BattleScene extends Phaser.Scene {
     bar.add([bbg, bfill, badge]);
     const eyes = this.add.image(c.x, c.y - 4, 'eyes').setDepth(41).setAlpha(0);
     this.tweens.add({ targets: eyes, scaleY: 0.1, duration: 120, yoyo: true, repeat: -1, repeatDelay: 2400 + Math.random() * 2000 });
-    this.tokens.set(u.id, { c, bar, bfill, bw, badge, flash, glyph, eyes, big });
+    this.tokens.set(u.id, { c, bar, bfill, bw, badge, flash, glyph, eyes, big, glyphY: 27 * big });
   }
   setTokenPos(u) {
     const t = this.tokens.get(u.id);
@@ -946,7 +948,10 @@ export default class BattleScene extends Phaser.Scene {
       const slow = ch === ',' || ch === '~';
       (slow ? sfx.wade : sfx.step)();
       t.c.setDepth(32 + st.y * 0.01);
-      await this.tween({ targets: t.c, x: this.tx(st.x), y: this.ty(st.y), duration: slow ? 190 : 125, ease: 'Sine.InOut' });
+      FX.face(t, t.c.x, this.tx(st.x));
+      const dur = slow ? 210 : 150;
+      FX.hop(this, t, this.tx(st.x), this.ty(st.y), slow, dur);
+      await this.tween({ targets: t.c, x: this.tx(st.x), y: this.ty(st.y), duration: dur, ease: 'Sine.InOut' });
       this.refreshLight();
       this.refreshVisibility();
     }
@@ -986,25 +991,36 @@ export default class BattleScene extends Phaser.Scene {
     const t = this.tokens.get(a.id);
     const ang = Math.atan2(this.ty(b.y) - this.ty(a.y), this.tx(b.x) - this.tx(a.x));
     const hx = this.tx(a.x), hy = this.ty(a.y);
-    await this.tween({ targets: t.c, x: hx - Math.cos(ang) * 7, y: hy - Math.sin(ang) * 7, scaleX: 0.92, scaleY: 1.08, duration: 160, ease: 'Quad.Out' });
+    FX.face(t, hx, this.tx(b.x));
+    await this.tween({ targets: t.c, x: hx - Math.cos(ang) * 10, y: hy - Math.sin(ang) * 10, scaleX: 0.9, scaleY: 1.1, duration: 180, ease: 'Quad.Out' });
   }
-  async strike(a, b, dist = 18) {
+  async strike(a, b, dist = 18, { crit = false } = {}) {
     const t = this.tokens.get(a.id);
     const hx = this.tx(a.x), hy = this.ty(a.y);
-    const ang = Math.atan2(this.ty(b.y) - hy, this.tx(b.x) - hx);
-    await this.tween({ targets: t.c, x: hx + Math.cos(ang) * dist, y: hy + Math.sin(ang) * dist, scaleX: 1.08, scaleY: 0.94, duration: 70, ease: 'Quad.In' });
-    this.tweens.add({ targets: t.c, x: hx, y: hy, scaleX: 1, scaleY: 1, duration: 200, delay: 60, ease: 'Quad.Out' });
+    const bx = this.tx(b.x), by = this.ty(b.y);
+    const ang = Math.atan2(by - hy, bx - hx);
+    FX.afterimage(this, t, FX.swingColor(a));
+    await this.tween({ targets: t.c, x: hx + Math.cos(ang) * (dist + 6), y: hy + Math.sin(ang) * (dist + 6), scaleX: 1.1, scaleY: 0.92, duration: 75, ease: 'Quad.In' });
+    const col = FX.swingColor(a);
+    FX.slash(this, bx - Math.cos(ang) * 6, by - 8 - Math.sin(ang) * 6, ang, col, { crit, heavy: !!a.heavy || a.id === 'warden' });
+    FX.impact(this, bx - Math.cos(ang) * 10, by - 10 - Math.sin(ang) * 10, col, { crit, ang });
+    if (crit) FX.zoomPunch(this, bx, by);
+    this.tweens.add({ targets: t.c, x: hx, y: hy, scaleX: 1, scaleY: 1, duration: 220, delay: 70, ease: 'Quad.Out' });
   }
   async settle(a) {
     const t = this.tokens.get(a.id);
     await this.tween({ targets: t.c, x: this.tx(a.x), y: this.ty(a.y), scaleX: 1, scaleY: 1, duration: 140 });
   }
   async projectile(a, b, tint = C.dread, tex = 'spark', scale = 2.4) {
-    const p = this.add.image(this.tx(a.x), this.ty(a.y), tex).setDepth(52).setScale(scale).setTint(tint).setBlendMode('ADD');
-    const trail = this.add.particles(0, 0, 'spark', { follow: p, lifespan: 260, scale: { start: 1.2, end: 0 }, alpha: { start: 0.7, end: 0 }, tint, blendMode: 'ADD', frequency: 14 }).setDepth(51);
     sfx.whoosh();
-    await this.tween({ targets: p, x: this.tx(b.x), y: this.ty(b.y), duration: 220, ease: 'Quad.In' });
-    p.destroy(); this.time.delayedCall(300, () => trail.destroy());
+    const at = this.tokens.get(a.id);
+    if (at) {
+      FX.face(at, this.tx(a.x), this.tx(b.x));
+      this.tweens.add({ targets: at.c, scaleX: 1.12, scaleY: 0.9, duration: 80, yoyo: true });
+      const m = this.add.image(this.tx(a.x), this.ty(a.y) - 14, 'glow').setDepth(52).setBlendMode('ADD').setTint(tint).setScale(0.1);
+      this.tweens.add({ targets: m, scale: 0.4, alpha: 0, duration: 200, onComplete: () => m.destroy() });
+    }
+    await FX.bolt(this, this.tx(a.x), this.ty(a.y) - 14, this.tx(b.x), this.ty(b.y) - 10, tint, { size: Math.max(0.7, scale / 2.4), lob: tex === 'smoke' ? 10 : 30 });
   }
   dmgBonusVs(u, e) {
     let b = u.mods.dmg ?? 0;
@@ -1028,7 +1044,7 @@ export default class BattleScene extends Phaser.Scene {
       if (res.fumble) { this.run.stats.fumbles++; this.addDread(u, 10); }
       return;
     }
-    if (!sk.ranged) await this.strike(u, e);
+    if (!sk.ranged) await this.strike(u, e, 18, { crit: res.crit });
     const critMul = res.crit ? (R.hasRelic(this.run, 'r_tithe') ? 3 : 2) : 1;
     const forced = this.tut?.takeForced('dmg');
     const dmg = forced ?? R.rollDice(this.rng, sk.dmg, critMul, this.dmgBonusVs(u, e)).total;
@@ -1066,12 +1082,17 @@ export default class BattleScene extends Phaser.Scene {
     for (const st of pp.path) {
       e.x = st.x; e.y = st.y;
       t.c.setDepth(32 + st.y * 0.01);
+      FX.afterimage(this, t, 0xbfe6dc);
+      this.fx.dust.explode(3, t.c.x, t.c.y + 18);
       await this.tween({ targets: t.c, x: this.tx(st.x), y: this.ty(st.y), duration: 95, ease: 'Quad.Out' });
+      FX.afterimage(this, t, 0xbfe6dc);
     }
     if (pp.path.length && R.hasRelic(this.run, 'r_charter') && e.side === 'enemy') await this.damage(e, R.die(this.rng, 4), { quiet: true });
     if (e.dead) return;
     if (pp.result === 'wall') {
       sfx.slam(); this.cameras.main.shake(160, 0.007);
+      FX.impact(this, t.c.x, t.c.y - 6, 0xd9cfb8, { crit: true });
+      this.fx.dust.explode(14, t.c.x, t.c.y);
       floatText(this, this.tx(e.x), this.ty(e.y) - 30, 'SLAM', HEX.amber, { size: 18 });
       await this.damage(e, R.die(this.rng, 4) + 1 + slamBonus, { quiet: true, by });
     } else if (pp.result === 'unit') {
@@ -1106,6 +1127,7 @@ export default class BattleScene extends Phaser.Scene {
   async brace(u) {
     u.braced = true; sfx.brace();
     const t = this.tokens.get(u.id);
+    FX.shieldDome(this, t.c.x, t.c.y, C.amber);
     await this.tween({ targets: t.c, scale: 1.15, duration: 120, yoyo: true });
     this.fx.spark.explode(16, t.c.x, t.c.y);
     floatText(this, t.c.x, t.c.y - 30, '+3 GUARD', HEX.amber, { size: 18 });
@@ -1259,9 +1281,16 @@ export default class BattleScene extends Phaser.Scene {
     if (u.flaw === 'frail') amount += 2;
     u.hp = Math.max(0, u.hp - amount);
     (crit || amount >= 10 ? sfx.bigHit : sfx.hit)();
-    t.flash.setAlpha(0.9);
-    this.tweens.add({ targets: t.flash, alpha: 0, duration: 200 });
+    t.flash.setAlpha(0.8);
+    this.tweens.add({ targets: t.flash, alpha: 0, duration: 170, ease: 'Quad.Out' });
     this.tweens.add({ targets: t.c, scaleX: 1.18, scaleY: 0.86, duration: 70, yoyo: true });
+    if (by && !by.dead && by !== u) {
+      const ka = Math.atan2(this.ty(u.y) - this.ty(by.y), this.tx(u.x) - this.tx(by.x));
+      const kd = crit ? 16 : 9;
+      FX.face(t, this.tx(u.x), this.tx(by.x));
+      this.tweens.add({ targets: [t.glyph, t.flash], angle: (Math.cos(ka) >= 0 ? 1 : -1) * (crit ? 14 : 8), duration: 80, yoyo: true });
+      this.tweens.add({ targets: t.c, x: this.tx(u.x) + Math.cos(ka) * kd, y: this.ty(u.y) + Math.sin(ka) * kd, duration: 80, ease: 'Quad.Out', yoyo: true, hold: 60 });
+    }
     (u.side === 'enemy' && ['husk', 'bishop', 'eel'].includes(u.kind) ? this.fx.brine : this.fx.blood).explode(crit ? 30 : 16, t.c.x, t.c.y);
     if (crit) this.fx.gold.explode(36, t.c.x, t.c.y);
     floatText(this, t.c.x, t.c.y - 28, `-${amount}${crit ? '!' : ''}`, crit ? HEX.amberHot : u.side === 'hero' ? '#ff6b57' : HEX.bone, { size: crit ? 34 : 24 });
@@ -1293,7 +1322,8 @@ export default class BattleScene extends Phaser.Scene {
     sfx.death();
     this.fx.smoke.explode(12, t.c.x, t.c.y);
     if (this.s.lantern.carrier === u.id) this.s.lantern = { carrier: null, x: u.x, y: u.y };
-    this.tweens.add({ targets: [t.c], scale: 0.3, alpha: 0, angle: 40, duration: 500, ease: 'Quad.In' });
+    const away = by ? Math.atan2(this.ty(u.y) - this.ty(by.y), this.tx(u.x) - this.tx(by.x)) : 0;
+    FX.topple(this, t, away, { hero: u.side === 'hero' });
     this.tweens.add({ targets: [t.bar, t.eyes], alpha: 0, duration: 300 });
     if (u.side === 'enemy') {
       this.run.stats.kills++;
@@ -1320,7 +1350,12 @@ export default class BattleScene extends Phaser.Scene {
     const t = this.tokens.get(e.id);
     sfx.splash();
     this.fx.brine.explode(40, t.c.x, t.c.y);
-    await this.tween({ targets: [t.c], scale: 0.1, alpha: 0, duration: 700, ease: 'Quad.In' });
+    for (let i = 0; i < 3; i++) {
+      const r = this.add.ellipse(t.c.x, t.c.y + 16, 14, 6).setStrokeStyle(2, 0xbfe6dc, 0.9).setDepth(33);
+      this.tweens.add({ targets: r, scaleX: 5, scaleY: 4, alpha: 0, duration: 700, delay: i * 180, onComplete: () => r.destroy() });
+    }
+    this.tweens.add({ targets: [t.glyph, t.flash], angle: 20, duration: 600 });
+    await this.tween({ targets: [t.c], y: t.c.y + 26, scaleY: 0.5, alpha: 0, duration: 800, ease: 'Quad.In' });
     this.run.stats.drowned++;
     if (R.hasRelic(this.run, 'r_charter')) floatText(this, t.c.x, t.c.y - 20, `+${this.silver(10)} silver`, '#c9d4d2', { size: 15 });
     this.log(`The ${e.name} sinks into the black water.`, HEX.teal);
@@ -1444,7 +1479,7 @@ export default class BattleScene extends Phaser.Scene {
     let res = await this.roll({ label: `${e.name} attacks ${this.hname(h)}`, bonus: e.atk, dc: R.guardOf(h), mode: am.mode, reasons: am, roller: e, enemy: true });
     if (!res.hit) { await this.settle(e); this.missFx(h, res.fumble ? 'FUMBLE' : 'MISS'); return; }
     if (ranged) { await this.settle(e); await this.projectile(e, h, e.kind === 'choir' ? C.dread : C.red, 'spark', 2); }
-    else await this.strike(e, h);
+    else await this.strike(e, h, 18, { crit: res.crit });
     let dmg = R.rollDice(this.rng, e.dmg, res.crit ? 2 : 1).total;
     let mult = 1;
     let reacted = 'none';

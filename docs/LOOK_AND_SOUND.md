@@ -46,3 +46,16 @@ The source packs are not committed. To regenerate `assets/`, download the packs 
 python -I tools/build_sprites.py "<path>/Dungeon Crawl Stone Soup Full" assets/sprites
 python -I tools/build_audio.py "<folder with the unzipped sound packs>" assets/sfx
 ```
+
+## Combat animation pass (v3.2)
+
+Built in `src/battleFx.js`, a presentation-only layer that `BattleScene` calls into.
+
+- **Movement:** units hop with each step and turn to face where they're going. Stone floors kick up dust; water leaves a splash and a ripple.
+- **Melee:** a deeper wind-up crouch, then a lunge that leaves an afterimage. A crescent slash sweeps across the target in the attacker's colour (gold for Brannoc, sea-green for Ysolde, bronze for Old Hesk, red for cultists and so on). On contact there's an impact flash, a shockwave ring and a cone of sparks.
+- **Crits:** a double slash, a bigger shockwave and a small camera zoom toward the blow.
+- **Getting hit:** a white hit-flash, a stagger away from the attacker, and a tilt. A short freeze-frame (hit-stop) makes the blow land.
+- **Ranged:** the caster recoils and a muzzle glow appears. The bolt travels in an arc with a hot core and a particle tail, then bursts on impact.
+- **Shoves:** a trail of afterimages and dust. Slamming into a wall gives a heavy impact and debris.
+- **Brace:** a golden shield dome rises around the hero.
+- **Deaths:** a flash, then the body staggers, tips over with a bounce, darkens and gives up a rising wisp of light. Drowning foes sink with expanding ripples.
