@@ -59,3 +59,19 @@ Built in `src/battleFx.js`, a presentation-only layer that `BattleScene` calls i
 - **Shoves:** a trail of afterimages and dust. Slamming into a wall gives a heavy impact and debris.
 - **Brace:** a golden shield dome rises around the hero.
 - **Deaths:** a flash, then the body staggers, tips over with a bounce, darkens and gives up a rising wisp of light. Drowning foes sink with expanding ripples.
+
+## Enemy signature attacks (v3.3)
+
+Each enemy type now winds up and lands its blow in its own way:
+
+| Enemy | Tell | Attack |
+|---|---|---|
+| Lamp-Cultist | Raises its lamp overhead | Smashes it down: ember burst, ground shockwave and floor cracks |
+| Gutter-Wretch | Coils low | Darts in leaving a red afterimage trail, then an X-slash |
+| Drowned Husk | Sways | Lurching rake: three green claw marks and a brine spray |
+| Wick-Snuffer | Leans in | Smothers its target in a black smoke cloud. It also leans over braziers, choking the flame and dropping embers. |
+| Choir Wretch | Rises and screams | Rings of sound roll across the room |
+| Censer-Monk | Swings the censer | Lobs green incense. Heals rise in a ring of green motes. |
+| Eel-Priest | Coils back | Throws a chain hook. On a hit, the hero is dragged along the retracting chain. |
+| Tide-Knight | A red glint and a "HEAVY" warning | Overhead slam with a huge shockwave and screen shake |
+| Drowned Bishop | A red glint and a "HEAVY" warning | Water-shockwave slam. Cleave sweeps a wide arc of water. Raising the dead erupts a geyser and the husk climbs out of the pool. The litany spins a ring of red runes, darkens the room and makes every brazier gutter. |

@@ -1461,7 +1461,7 @@ export default class BattleScene extends Phaser.Scene {
       case 'heal': await this.censerHeal(e, plan.ally); break;
       case 'cleave': {
         const targets = R.alive(this.s, 'hero').filter((h) => R.cheb(h, e) <= 1);
-        if (targets.length > 1) floatText(this, t.c.x, t.c.y - 50, 'CENSER CLEAVE', HEX.red, { size: 16 });
+        if (targets.length > 1) { floatText(this, t.c.x, t.c.y - 50, 'CENSER CLEAVE', HEX.red, { size: 16 }); FX.glint(this, t.c.x, t.c.y - 50); await this.wait(250); FX.cleaveArc(this, t.c.x, t.c.y); sfx.whoosh(); }
         for (const h of targets) { if (this.over) break; await this.enemyStrike(e, h, false); }
         break;
       }
@@ -1470,16 +1470,88 @@ export default class BattleScene extends Phaser.Scene {
       default: break;
     }
   }
+  // ---------- enemy signatures: each kind telegraphs and lands its blow its own way ----------
+  async enemyWindUp(e, h, ranged) {
+    const t = this.tokens.get(e.id);
+    const ex = this.tx(e.x), ey = this.ty(e.y);
+    FX.face(t, ex, this.tx(h.x));
+    const lift = (dy, sy, dur) => this.tween({ targets: [t.glyph, t.flash], y: t.glyphY + dy, scaleY: (t.glyph.scaleX) * sy, duration: dur, ease: 'Quad.Out' });
+    switch (e.kind) {
+      case 'cultist': await this.windUp(e, h); await lift(-12, 1.12, 160); break;            // lamp raised high
+      case 'gutter': await this.tween({ targets: t.c, scaleX: 1.12, scaleY: 0.84, duration: 120 }); break; // coils low
+      case 'husk': await this.tween({ targets: [t.glyph, t.flash], angle: -10, duration: 220, ease: 'Sine.InOut', yoyo: true }); await this.windUp(e, h); break;
+      case 'choir': await lift(-10, 1.06, 240); sfx.scream(); break;                         // rises to sing
+      case 'knight': case 'bishop':
+        await this.windUp(e, h); await lift(-8, 1.1, 180);
+        FX.glint(this, ex + 10, ey - 44 * t.big);
+        if (!ranged) floatText(this, ex, ey - 62 * t.big, 'HEAVY', HEX.red, { size: 15 });
+        await this.wait(280); break;
+      default: await this.windUp(e, h);
+    }
+  }
+  resetPose(e) {
+    const t = this.tokens.get(e.id); if (!t) return;
+    this.tweens.add({ targets: [t.glyph, t.flash], y: t.glyphY, angle: 0, scaleY: t.glyph.scaleX, duration: 180, ease: 'Quad.Out' });
+  }
+  async enemyShot(e, h) {
+    const ex = this.tx(e.x), ey = this.ty(e.y) - 14, hx = this.tx(h.x), hy = this.ty(h.y) - 10;
+    switch (e.kind) {
+      case 'choir': await FX.soundWave(this, ex, ey, hx, hy, 0xc8a0ff); break;
+      case 'censer': this.fx.smoke.explode(6, ex, ey); await FX.bolt(this, ex, ey, hx, hy, 0x8fdf93, { lob: 50, size: 1.1 }); FX.smother(this, hx, hy + 6); break;
+      case 'eel': await FX.bolt(this, ex, ey, hx, hy, 0x7fe0ff, { lob: 10, size: 0.9 }); break;
+      default: await this.projectile(e, h, C.red, 'spark', 2);
+    }
+    this.resetPose(e);
+  }
+  async enemyMelee(e, h, crit) {
+    const t = this.tokens.get(e.id);
+    const hx = this.tx(h.x), hy = this.ty(h.y);
+    const ang = Math.atan2(hy - this.ty(e.y), hx - this.tx(e.x));
+    switch (e.kind) {
+      case 'cultist':
+        this.tweens.add({ targets: [t.glyph, t.flash], y: t.glyphY + 4, scaleY: t.glyph.scaleX * 0.9, duration: 70, ease: 'Quad.In' });
+        await this.strike(e, h, 16, { crit });
+        FX.smash(this, hx, hy, 0xff8a3a);
+        this.fx.fire.explode(14, hx, hy - 6);
+        break;
+      case 'gutter':
+        for (let i = 0; i < 3; i++) this.time.delayedCall(i * 25, () => FX.afterimage(this, t, 0xd0402c));
+        await this.strike(e, h, 28, { crit });
+        FX.xSlash(this, hx, hy - 8, 0xff5a4a);
+        break;
+      case 'husk':
+        await this.strike(e, h, 14, { crit });
+        FX.clawMarks(this, hx, hy - 10, ang, 0x9fdf7a);
+        this.fx.brine.explode(16, hx, hy);
+        break;
+      case 'snuffer':
+        await this.strike(e, h, 18, { crit });
+        FX.smother(this, hx, hy - 6);
+        break;
+      case 'knight':
+        this.tweens.add({ targets: [t.glyph, t.flash], y: t.glyphY + 6, scaleY: t.glyph.scaleX * 0.88, duration: 80, ease: 'Quad.In' });
+        await this.strike(e, h, 24, { crit: true });
+        FX.smash(this, hx, hy, 0xe0f0f0, true);
+        break;
+      case 'bishop':
+        await this.strike(e, h, 22, { crit: true });
+        FX.smash(this, hx, hy, 0x9fd6cb, true);
+        this.fx.brine.explode(24, hx, hy);
+        break;
+      default: await this.strike(e, h, 18, { crit });
+    }
+    this.resetPose(e);
+  }
+
   async enemyStrike(e, h, ranged) {
     if (h.dead) return;
     if (this.tut) await this.tut.trigger('beforeEnemyAttack');
-    await this.windUp(e, h);
-    if (e.kind === 'choir') sfx.scream();
+    await this.enemyWindUp(e, h, ranged);
     const am = R.attackMode(this.s, e, h, ranged);
     let res = await this.roll({ label: `${e.name} attacks ${this.hname(h)}`, bonus: e.atk, dc: R.guardOf(h), mode: am.mode, reasons: am, roller: e, enemy: true });
-    if (!res.hit) { await this.settle(e); this.missFx(h, res.fumble ? 'FUMBLE' : 'MISS'); return; }
-    if (ranged) { await this.settle(e); await this.projectile(e, h, e.kind === 'choir' ? C.dread : C.red, 'spark', 2); }
-    else await this.strike(e, h, 18, { crit: res.crit });
+    if (!res.hit) { await this.settle(e); this.resetPose(e); this.missFx(h, res.fumble ? 'FUMBLE' : 'MISS'); return; }
+    if (ranged) { await this.settle(e); await this.enemyShot(e, h); }
+    else await this.enemyMelee(e, h, res.crit);
     let dmg = R.rollDice(this.rng, e.dmg, res.crit ? 2 : 1).total;
     let mult = 1;
     let reacted = 'none';
@@ -1515,7 +1587,7 @@ export default class BattleScene extends Phaser.Scene {
       }
     }
     this.say('enemyHit', { hero: h, foe: e }, HEX.red);
-    await this.damage(h, dmg, { crit: res.crit, quiet: false });
+    await this.damage(h, dmg, { crit: res.crit, quiet: false, by: e });
     if (h.dead) return;
     if (res.crit) this.addDread(h, 10);
     if (e.dreadOnHit) this.addDread(h, Math.round(e.dreadOnHit * (mult < 1 ? 0.5 : 1)));
@@ -1523,24 +1595,33 @@ export default class BattleScene extends Phaser.Scene {
   }
   async enemyPull(e, h, dmgSpec, dist) {
     if (h.dead) return;
-    await this.projectile(e, h, C.bone, 'spark', 1.4);
+    const et = this.tokens.get(e.id);
+    FX.face(et, this.tx(e.x), this.tx(h.x));
+    await this.tween({ targets: et.c, scaleX: 0.9, scaleY: 1.1, duration: 150 });
+    this.tweens.add({ targets: et.c, scaleX: 1.1, scaleY: 0.92, duration: 90, yoyo: true });
     sfx.hook();
+    const chain = FX.chainHook(this, this.tx(e.x), this.ty(e.y) - 14);
+    await chain.throwTo(this.tx(h.x), this.ty(h.y) - 10);
     const res = await this.roll({ label: `${e.name} hooks ${this.hname(h)}`, bonus: e.atk, dc: R.guardOf(h), mode: 0, roller: e, enemy: true });
-    if (!res.hit) { this.missFx(h, 'MISS'); return; }
+    if (!res.hit) { await chain.retract(); this.missFx(h, 'MISS'); return; }
     if (h.reaction) {
       h.reaction = false;
       const r = await this.reactRing(h, e);
-      if (r === 'perfect') { this.run.stats.parries++; this.log('The hook bites nothing but air.', HEX.amberHot); return; }
+      if (r === 'perfect') { this.run.stats.parries++; FX.impact(this, this.tx(h.x), this.ty(h.y) - 10, 0xd9cfb8); await chain.retract(140); this.log('The hook bites nothing but air.', HEX.amberHot); return; }
     }
+    FX.impact(this, this.tx(h.x), this.ty(h.y) - 10, 0x7fe0ff);
     const pp = R.pullPath(this.s, e, h, dist);
     const t = this.tokens.get(h.id);
     this.say('pull', { hero: h, foe: e }, HEX.red, true);
     for (const st of pp.path) {
       h.x = st.x; h.y = st.y;
       t.c.setDepth(32 + st.y * 0.01);
-      await this.tween({ targets: t.c, x: this.tx(st.x), y: this.ty(st.y), duration: 120 });
+      FX.afterimage(this, t, 0x7fe0ff);
+      this.fx.dust.explode(3, t.c.x, t.c.y + 18);
+      await this.tween({ targets: t.c, x: this.tx(st.x), y: this.ty(st.y), duration: 130, ease: 'Quad.In', onUpdate: () => chain.set(t.c.x, t.c.y - 10) });
       this.refreshLight();
     }
+    chain.retract(160);
     if (pp.result === 'water') await this.fallInWater(h, null);
     await this.damage(h, R.rollDice(this.rng, dmgSpec).total, { quiet: true });
     this.refreshAll();
@@ -1548,7 +1629,12 @@ export default class BattleScene extends Phaser.Scene {
   async censerHeal(e, ally) {
     if (!ally || ally.dead) return;
     sfx.chime();
-    await this.projectile(e, ally, 0x8fdf93, 'smoke', 1.6);
+    const et = this.tokens.get(e.id);
+    this.tweens.add({ targets: [et.glyph, et.flash], angle: { from: -14, to: 14 }, duration: 160, yoyo: true, repeat: 1 });
+    this.fx.smoke.explode(6, this.tx(e.x), this.ty(e.y) - 10);
+    await FX.bolt(this, this.tx(e.x), this.ty(e.y) - 14, this.tx(ally.x), this.ty(ally.y) - 10, 0x8fdf93, { lob: 50, size: 1 });
+    FX.incense(this, this.tx(ally.x), this.ty(ally.y));
+    this.resetPose(e);
     const amt = Math.min(5, ally.maxHp - ally.hp);
     ally.hp += amt; ally.guardBuff = 2;
     floatText(this, this.tx(ally.x), this.ty(ally.y) - 30, `+${amt} · +2 GUARD`, '#8fdf93', { size: 16 });
@@ -1560,8 +1646,13 @@ export default class BattleScene extends Phaser.Scene {
     if (!b || !b.lit) return;
     if (R.hasRelic(this.run, 'r_wick')) { floatText(this, this.tx(b.x), this.ty(b.y) - 30, 'IT WILL NOT GO OUT', HEX.amberHot, { size: 14 }); return; }
     if (e.boss) await this.projectile(e, b, 0x203a3a, 'smoke', 2);
+    const et = this.tokens.get(e.id);
+    if (!e.boss && et) { FX.face(et, this.tx(e.x), this.tx(b.x)); await this.tween({ targets: et.c, x: (this.tx(e.x) * 2 + this.tx(b.x)) / 3, y: (this.ty(e.y) * 2 + this.ty(b.y)) / 3, duration: 160, yoyo: true }); }
     b.lit = false; sfx.snuff();
+    FX.smother(this, this.tx(b.x), this.ty(b.y) - 10);
+    this.tweens.add({ targets: b.glow, alpha: 0, scale: 0.3, duration: 500 });
     this.fx.smoke.explode(20, this.tx(b.x), this.ty(b.y));
+    this.fx.fire.explode(8, this.tx(b.x), this.ty(b.y) - 6);
     this.say('snuff', {}, HEX.boneDim);
     this.refreshAll();
     for (const h of R.alive(this.s, 'hero')) if (R.lightAt(this.s, h.x, h.y) === R.LIGHT.DARK) this.addDread(h, 5);
@@ -1572,6 +1663,9 @@ export default class BattleScene extends Phaser.Scene {
     if (!tiles.length) return;
     sfx.raise();
     const tile = tiles.sort((a, b) => R.cheb(a, e) - R.cheb(b, e))[0];
+    const bt = this.tokens.get(e.id);
+    if (bt) this.tweens.add({ targets: [bt.glyph, bt.flash], y: bt.glyphY - 12, duration: 300, yoyo: true, hold: 300 });
+    FX.geyser(this, this.tx(tile.x), this.ty(tile.y));
     this.fx.brine.explode(50, this.tx(tile.x), this.ty(tile.y));
     this.cameras.main.shake(400, 0.006);
     const id = `raised${this.s.summons++}`;
@@ -1580,8 +1674,10 @@ export default class BattleScene extends Phaser.Scene {
     this.s.units.push(base);
     this.makeToken(base);
     const t = this.tokens.get(id);
-    t.c.setScale(0.1);
-    this.tweens.add({ targets: t.c, scale: 1, duration: 600, ease: 'Back.Out' });
+    // it climbs up out of the pool
+    t.glyph.y = t.glyphY + 40; t.flash.y = t.glyphY + 40; t.glyph.setAlpha(0);
+    this.tweens.add({ targets: t.glyph, y: t.glyphY, alpha: 1, duration: 800, delay: 250, ease: 'Back.Out' });
+    this.tweens.add({ targets: t.flash, y: t.glyphY, duration: 800, delay: 250, ease: 'Back.Out' });
     this.log('The Bishop lifts his hands, and the water gives up one of its dead.', HEX.red);
     this.refreshAll();
     await this.wait(600);
@@ -1591,6 +1687,8 @@ export default class BattleScene extends Phaser.Scene {
     const t = this.tokens.get(e.id);
     const ring = this.add.circle(t.c.x, t.c.y, 30).setStrokeStyle(4, C.red, 0.8).setDepth(52);
     this.tweens.add({ targets: ring, radius: 500, alpha: 0, duration: 1200, onComplete: () => ring.destroy() });
+    FX.darkLitany(this, t.c.x, t.c.y);
+    for (const b of this.s.braziers) if (b.lit) this.tweens.add({ targets: b.glow, alpha: 0.08, duration: 120, yoyo: true, repeat: 3 });
     floatText(this, t.c.x, t.c.y - 50, 'BACKWARDS LITANY', HEX.red, { size: 16 });
     this.log('The Bishop chants a psalm backwards. Every candle shivers.', HEX.red);
     for (const h of R.alive(this.s, 'hero')) {
