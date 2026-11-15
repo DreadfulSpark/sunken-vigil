@@ -299,3 +299,50 @@ export function incense(scene, x, y) {
   scene.time.delayedCall(600, () => p.stop());
   scene.time.delayedCall(1700, () => p.destroy());
 }
+
+// ---------------- hero signature effects ----------------
+
+// a jagged arc of drowned lightning from one point to another, flickering twice
+export function lightning(scene, x0, y0, x1, y1, color = 0x9fe8dc) {
+  return new Promise((done) => {
+    const g = scene.add.graphics().setDepth(54).setBlendMode(ADD);
+    const bolt = () => {
+      g.clear();
+      const n = Math.max(4, Math.floor(Math.hypot(x1 - x0, y1 - y0) / 16));
+      const nx = -(y1 - y0), ny = x1 - x0, nl = Math.hypot(nx, ny) || 1;
+      const pts = [{ x: x0, y: y0 }];
+      for (let i = 1; i < n; i++) {
+        const v = i / n, j = (Math.random() - 0.5) * 22;
+        pts.push({ x: x0 + (x1 - x0) * v + (nx / nl) * j, y: y0 + (y1 - y0) * v + (ny / nl) * j });
+      }
+      pts.push({ x: x1, y: y1 });
+      for (const [w, c, a] of [[9, color, 0.35], [4, color, 0.9], [1.5, 0xffffff, 1]]) {
+        g.lineStyle(w, c, a); g.beginPath(); g.moveTo(pts[0].x, pts[0].y);
+        for (const p of pts.slice(1)) g.lineTo(p.x, p.y);
+        g.strokePath();
+      }
+    };
+    bolt();
+    impact(scene, x1, y1, color, { ang: Math.atan2(y1 - y0, x1 - x0) });
+    scene.time.delayedCall(60, bolt);
+    scene.time.delayedCall(120, bolt);
+    scene.tweens.add({ targets: g, alpha: 0, duration: 220, delay: 140, onComplete: () => { g.destroy(); done(); } });
+  });
+}
+
+// a golden clock face that spins backwards over a hero: time given back
+export function clockFace(scene, x, y) {
+  const g = scene.add.graphics({ x, y }).setDepth(55).setBlendMode(ADD);
+  g.lineStyle(3, 0xffd27a, 1); g.strokeCircle(0, 0, 26);
+  g.lineStyle(1, 0xffd27a, 0.6); g.strokeCircle(0, 0, 20);
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2;
+    g.lineStyle(2, 0xfff3c9, 0.9); g.lineBetween(Math.cos(a) * 21, Math.sin(a) * 21, Math.cos(a) * 25, Math.sin(a) * 25);
+  }
+  const hands = scene.add.graphics({ x, y }).setDepth(56).setBlendMode(ADD);
+  hands.lineStyle(3, 0xfff3c9, 1); hands.lineBetween(0, 0, 0, -18); hands.lineBetween(0, 0, 11, 4);
+  g.setScale(0.3).setAlpha(0); hands.setScale(0.3).setAlpha(0);
+  scene.tweens.add({ targets: [g, hands], scale: 1.4, alpha: 1, duration: 260, ease: 'Back.Out' });
+  scene.tweens.add({ targets: hands, angle: -720, duration: 900, ease: 'Quad.InOut' });
+  scene.tweens.add({ targets: [g, hands], alpha: 0, scale: 2, duration: 300, delay: 900, onComplete: () => { g.destroy(); hands.destroy(); } });
+}

@@ -92,3 +92,15 @@ Every regular enemy gained one new move. Each move is shown in advance in the en
 | Tide-Knight | **Charge.** If a hero stands in a straight open line 2–5 tiles away, it charges along it and strikes for +2 damage and a 2-tile shove. The charge lane is shown in red. | Step out of the line. A charge into a hero with a wall behind them also causes a wall slam. |
 
 **Fix:** an enemy's plan used to be counted one turn later than the preview, so the Bishop's cycle could do something other than his intent showed. Now the intent you see is the move that happens.
+
+## Hero signature abilities (v3.5)
+
+Each hero keeps their kit and gains one signature ability. Signatures are strong but go on cooldown.
+
+On the action bar, a gold gem marks a signature that's ready, and its icon pulses. While it recharges, the button shows the rounds left, or "USED" for once-per-fight abilities. Every fight starts with all signatures ready.
+
+| Hero | Ability | Effect | Cooldown |
+|---|---|---|---|
+| **Brannoc** | **Floodgate Stand** | Leaps and slams his shield. Every adjacent foe is shoved 1 tile; walls and deep water still punish them. He gains +2 Guard (Brace) and **taunts**: every foe within 4 must come for him next enemy phase, so he can pull the choir off Ysolde or the gutter off a lone hero. | 3 rounds |
+| **Ysolde** | **Chain of Names** | Ranged 5. On a hit it deals 1d8+2 lightning, then the name arcs to up to 2 more foes within 2 tiles of each other (1d6+1 each, no roll). A jagged lightning bolt leaps from body to body. | 3 rounds |
+| **Old Hesk** | **The Ninth Hour** | An ally within 3 who has already moved or acted gets both back. Bell rings and a backwards-spinning golden clock appear over them. Use it to give Brannoc a second Undertow, or Ysolde a second Chain of Names. | Once per fight |

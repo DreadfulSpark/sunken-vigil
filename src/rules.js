@@ -228,6 +228,7 @@ function makeHeroUnit(run, h) {
     critOn: 20 - (m.crit ?? 0), dread: h.dread, flaw,
     moved: false, acted: false, reaction: true, marked: 0, braced: false, resolve: false, virtue: null,
     dead: false, inDeep: false, attackedYet: false, dazed: 0, burning: 0, firstParryDone: false,
+    cd: {}, taunting: false,
   };
 }
 function makeEnemyUnit(id, kind, x, y, tier) {
@@ -478,9 +479,12 @@ export function heroActions(s, u) {
   if (s.run.consumables.length) list.push('item');
   return list;
 }
+export const cooldownOf = (u, skillId) => (u.cd?.[skillId] ?? 0);
 export function skillTargets(s, u, skillId) {
   const sk = SKILLS[skillId];
-  if (sk.kind === 'self' || sk.kind === 'toll' || sk.kind === 'chime') return [{ x: u.x, y: u.y }];
+  if (sk.cd && cooldownOf(u, skillId) > 0) return [];
+  if (sk.kind === 'self' || sk.kind === 'toll' || sk.kind === 'chime' || sk.kind === 'stand') return [{ x: u.x, y: u.y }];
+  if (sk.kind === 'hour') return alive(s, 'hero').filter((h) => h !== u && cheb(h, u) <= sk.range && (h.acted || h.moved)).map((h) => ({ x: h.x, y: h.y, unit: h }));
   if (sk.kind === 'kindle') return s.braziers.filter((b) => !b.lit && cheb(b, u) <= 1).map((b) => ({ x: b.x, y: b.y }));
   if (sk.kind === 'open') return s.chests.filter((c) => !c.open && cheb(c, u) <= 1).map((c) => ({ x: c.x, y: c.y }));
   if (sk.kind === 'throw') return throwTiles(s, u, sk.range);
@@ -545,6 +549,7 @@ function targetScore(s, e, h) {
   if (h.inDeep) score -= 10;
   if (e.kind === 'gutter') score -= (3 - alive(s, 'hero').filter((o) => o !== h && cheb(o, h) <= 2).length) * 12;
   if (e.kind === 'snuffer' && s.lantern.carrier === h.id) score -= 30;
+  if (h.taunting && cheb(e, h) <= 4) score -= 200;
   return score + cheb(e, h) * 3;
 }
 function bestTile(s, e, reach, test) {
@@ -626,7 +631,8 @@ export function planEnemy(s, e) {
   }
 
   const adjacent = heroes.filter((h) => cheb(h, e) <= 1);
-  if (adjacent.length) {
+  const taunter = heroes.find((h) => h.taunting && cheb(e, h) <= 4);
+  if (adjacent.length && (!taunter || adjacent.includes(taunter))) {
     adjacent.sort((a, b) => targetScore(s, e, a) - targetScore(s, e, b));
     return { type: 'attack', path: [], target: adjacent[0] };
   }

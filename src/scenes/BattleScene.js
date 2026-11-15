@@ -396,6 +396,7 @@ export default class BattleScene extends Phaser.Scene {
       if (u.guardBuff) b.push('+2 GUARD');
       if (u.ward > 0) b.push(`WARD ${u.ward}`);
       if (u.snared) b.push('SNARED');
+      if (u.taunting) b.push('TAUNTING');
       if (u.resolve) b.push('RESOLUTE');
       if (u.virtue) b.push(VIRTUES[u.virtue].name.toUpperCase());
       if (u.flaw) b.push(FLAWS[u.flaw].name.toUpperCase());
@@ -665,17 +666,26 @@ export default class BattleScene extends Phaser.Scene {
     const u = this.sel;
     if (!u || u.dead || this.s.phase !== 'party') return;
     const acts = ['move', ...R.heroActions(this.s, u)];
-    acts.slice(0, 7).forEach((id, i) => {
+    acts.slice(0, 8).forEach((id, i) => {
       const sk = id === 'move' ? { name: 'Move', desc: `Walk up to ${u.move} tiles. Shallow water and climbing cost 2.` } : SKILLS[id];
-      const x = BX + 46 + i * 90, y = BY + BH + 46;
+      const x = BX + 42 + i * 78, y = BY + BH + 46;
+      const cdLeft = id !== 'move' && sk.cd ? R.cooldownOf(u, id) : 0;
       const enabled = id === 'move' ? !u.moved : !u.acted && (id === 'item' || R.skillTargets(this.s, u, id).length > 0);
-      const b = makeButton(this, x, y, 86, 56, '', () => this.chooseAction(id), {
-        onHover: (o) => this.hint(o ? `${sk.name}: ${sk.desc}` : ''),
+      const b = makeButton(this, x, y, 74, 56, '', () => this.chooseAction(id), {
+        onHover: (o) => this.hint(o ? `${sk.name}: ${sk.desc}${cdLeft ? (cdLeft >= 99 ? '  (Used this fight.)' : `  (Ready in ${cdLeft} round${cdLeft > 1 ? 's' : ''}.)`) : ''}` : ''),
       });
       const icon = this.add.image(0, -9, `ic_${id === 'move' ? 'move' : sk.icon}`).setScale(0.75);
       const lbl = this.add.text(0, 17, sk.name.toUpperCase(), { fontFamily: FONT_H, fontSize: '11px', color: HEX.bone, fontStyle: '700', align: 'center' }).setOrigin(0.5);
-      if (lbl.width > 80) lbl.setScale(80 / lbl.width);
+      if (lbl.width > 68) lbl.setScale(68 / lbl.width);
       b.add([icon, lbl]);
+      if (sk.cd) {
+        // signature abilities: a gold corner gem, and a countdown while they recharge
+        const gem = this.add.graphics();
+        gem.fillStyle(cdLeft ? 0x3a4442 : C.amberHot, 1); gem.fillPoints([{ x: 30, y: -27 }, { x: 36, y: -21 }, { x: 30, y: -15 }, { x: 24, y: -21 }], true);
+        b.add(gem);
+        if (cdLeft) b.add(this.add.text(0, -9, cdLeft >= 99 ? 'USED' : String(cdLeft), { fontFamily: FONT_H, fontSize: cdLeft >= 99 ? '13px' : '22px', color: HEX.bone, fontStyle: '900', stroke: '#050b0c', strokeThickness: 5 }).setOrigin(0.5));
+        else this.tweens.add({ targets: icon, scale: 0.86, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
+      }
       b.setEnabled(enabled && (!this.tut || this.tut.isFree() || id === 'move' ? true : this.tut.allowSkill(id)));
       if (this.ui === 'move' && id === 'move') b.setOn(true);
       if (this.ui === 'target' && this.skill === id) b.setOn(true);
@@ -745,7 +755,8 @@ export default class BattleScene extends Phaser.Scene {
       if (u.acted) return;
       if (this.tut && !this.tut.allowSkill(id)) { sfx.denied(); return; }
       const sk = SKILLS[id];
-      if (['self', 'toll', 'chime'].includes(sk.kind)) { this.doSkill(u, id, { x: u.x, y: u.y }); return; }
+      if (sk.cd && R.cooldownOf(u, id) > 0) { sfx.denied(); return; }
+      if (['self', 'toll', 'chime', 'stand'].includes(sk.kind)) { this.doSkill(u, id, { x: u.x, y: u.y }); return; }
       this.ui = 'target'; this.skill = id;
       this.hint(`${sk.name}: choose a target. Right-click or Esc to cancel.`);
     }
@@ -894,7 +905,8 @@ export default class BattleScene extends Phaser.Scene {
     s.phase = 'party';
     for (const u of R.heroUnits(s)) {
       if (u.dead) continue;
-      u.moved = false; u.acted = false; u.reaction = true; u.braced = false;
+      u.moved = false; u.acted = false; u.reaction = true; u.braced = false; u.taunting = false;
+      for (const k of Object.keys(u.cd ?? {})) if (u.cd[k] > 0 && u.cd[k] < 99) u.cd[k]--;
       if (u.mods.regen && u.hp < u.maxHp) { u.hp = Math.min(u.maxHp, u.hp + u.mods.regen); floatText(this, this.tx(u.x), this.ty(u.y) - 20, `+${u.mods.regen}`, '#8fdf93', { size: 18 }); }
     }
     for (const e of R.alive(s, 'enemy')) if (e.guardBuff) e.guardBuff = 0;
@@ -983,6 +995,7 @@ export default class BattleScene extends Phaser.Scene {
     this.tweens.killTweensOf(this.highlight); this.highlight.setAlpha(1);
     this.hint('');
     const target = tg.unit ?? R.unitAt(this.s, tg.x, tg.y);
+    if (sk.cd) u.cd[id] = sk.cd;
     try {
       switch (sk.kind) {
         case 'attack': await this.heroAttack(u, target, sk); break;
@@ -994,6 +1007,9 @@ export default class BattleScene extends Phaser.Scene {
         case 'open': await this.openChest(u, R.chestAt(this.s, tg.x, tg.y)); break;
         case 'toll': await this.toll(u, sk); break;
         case 'chime': await this.chime(u, sk); break;
+        case 'stand': await this.floodgateStand(u, sk); break;
+        case 'chain': await this.chainOfNames(u, target, sk); break;
+        case 'hour': await this.ninthHour(u, target); break;
         default: break;
       }
     } catch (err) { console.error(err); }
@@ -1207,6 +1223,83 @@ export default class BattleScene extends Phaser.Scene {
     this.modal = true;
     return new Promise((res) => showLootChoice(this, this.run, ids, { title, subtitle, onDone: () => { this.modal = false; this.refreshHud(); res(); } }));
   }
+  // ---------- hero signature abilities ----------
+  async floodgateStand(u, sk) {
+    const t = this.tokens.get(u.id);
+    u.taunting = true; u.braced = true;
+    this.say('brace', { hero: u });
+    floatText(this, t.c.x, t.c.y - 54, 'FLOODGATE STAND', HEX.amberHot, { size: 18 });
+    await this.tween({ targets: [t.glyph, t.flash], y: t.glyphY - 14, duration: 180, ease: 'Quad.Out' });
+    await this.tween({ targets: [t.glyph, t.flash], y: t.glyphY + 3, duration: 90, ease: 'Quad.In' });
+    sfx.slam(); sfx.brace();
+    FX.smash(this, t.c.x, t.c.y, C.amber, true);
+    FX.shieldDome(this, t.c.x, t.c.y, C.amber);
+    this.resetPose(u);
+    // a ring of gold that reaches out to every foe within 4: the taunt
+    const ring = this.add.circle(t.c.x, t.c.y, 20).setStrokeStyle(3, C.amber, 0.9).setDepth(52);
+    this.tweens.add({ targets: ring, radius: 4.5 * T, alpha: 0, duration: 700, onComplete: () => ring.destroy() });
+    const foes = R.alive(this.s, 'enemy').filter((e) => R.cheb(e, u) <= 1);
+    for (const e of foes) { if (!e.dead) await this.push(u, e, 1, { by: u }); }
+    for (const e of R.alive(this.s, 'enemy').filter((e) => R.cheb(e, u) <= 4)) floatText(this, this.tx(e.x), this.ty(e.y) - 40, 'TAUNTED', HEX.amber, { size: 13 });
+    this.log('Brannoc plants himself like the floodgate he once held. Everything that hates the living turns toward him.', HEX.amberHot);
+    this.refreshAll();
+    await this.wait(250);
+  }
+  async chainOfNames(u, e, sk) {
+    if (!e) return;
+    await this.windUp(u, e);
+    const am = R.attackMode(this.s, u, e, true);
+    u.attackedYet = true;
+    const res = await this.roll({ label: `${this.hname(u)} · ${sk.name}`, bonus: R.attackBonus(this.s, u, e), dc: R.guardOf(e), mode: am.mode, reasons: am, roller: u, allowPush: true, fate: 'hero', critOn: u.critOn });
+    await this.settle(u);
+    const ut = this.tokens.get(u.id);
+    floatText(this, ut.c.x, ut.c.y - 54, 'CHAIN OF NAMES', HEX.dread, { size: 17 });
+    if (!res.hit) {
+      await FX.lightning(this, ut.c.x, ut.c.y - 14, this.tx(e.x) + 26, this.ty(e.y) - 30, 0x9fe8dc);
+      this.missFx(e, res.fumble ? 'FUMBLE' : 'MISS');
+      return;
+    }
+    // the name leaps from foe to foe
+    const hit = [e];
+    let from = { x: ut.c.x, y: ut.c.y - 14 };
+    let cur = e;
+    for (let j = 0; j <= sk.jumps && cur; j++) {
+      const tx = this.tx(cur.x), ty = this.ty(cur.y) - 10;
+      sfx.mark();
+      await FX.lightning(this, from.x, from.y, tx, ty, 0x9fe8dc);
+      const dmg = j === 0 ? R.rollDice(this.rng, sk.dmg, res.crit ? 2 : 1, this.dmgBonusVs(u, cur)).total : R.rollDice(this.rng, '1d6+1').total;
+      await this.damage(cur, dmg, { crit: res.crit && j === 0, by: u, quiet: j > 0, source: j ? 'arc' : '' });
+      from = { x: tx, y: ty };
+      const last = cur;
+      cur = R.alive(this.s, 'enemy').filter((o) => !hit.includes(o) && R.cheb(o, last) <= 2)
+        .sort((a, b) => R.cheb(a, last) - R.cheb(b, last))[0];
+      if (cur) hit.push(cur);
+    }
+    if (hit.length > 1) this.log(`The name leaps between ${hit.length} of them. Each one flinches at a word it has not heard in forty years.`, HEX.dread);
+    this.refreshAll();
+  }
+  async ninthHour(u, ally) {
+    if (!ally || ally.dead) return;
+    const t = this.tokens.get(u.id), at = this.tokens.get(ally.id);
+    floatText(this, t.c.x, t.c.y - 54, 'THE NINTH HOUR', HEX.amberHot, { size: 18 });
+    this.tweens.add({ targets: [t.glyph, t.flash], angle: { from: -16, to: 16 }, duration: 140, yoyo: true, repeat: 2 });
+    sfx.toll();
+    for (let i = 0; i < 3; i++) {
+      const ring = this.add.circle(t.c.x, t.c.y, 16).setStrokeStyle(3, C.amberHot, 0.9).setDepth(52);
+      this.tweens.add({ targets: ring, radius: 70, alpha: 0, duration: 600, delay: i * 180, onComplete: () => ring.destroy() });
+    }
+    await this.wait(300);
+    await FX.bolt(this, t.c.x, t.c.y - 14, at.c.x, at.c.y - 14, C.amberHot, { lob: 40, size: 0.9 });
+    FX.clockFace(this, at.c.x, at.c.y - 6);
+    this.fx.gold.explode(30, at.c.x, at.c.y);
+    ally.acted = false; ally.moved = false; ally.reaction = true;
+    sfx.resolve();
+    floatText(this, at.c.x, at.c.y - 44, 'MOVE + ACTION RESTORED', HEX.amberHot, { size: 15 });
+    this.log(`Old Hesk rings an hour that has not been rung since the flood. For ${this.hname(ally)}, time folds back.`, HEX.amberHot);
+    this.refreshAll();
+    await this.wait(300);
+  }
+
   async toll(u, sk) {
     sfx.toll();
     const t = this.tokens.get(u.id);

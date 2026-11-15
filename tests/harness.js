@@ -84,6 +84,11 @@ W.heroTurn = async (u) => {
     b.onTile(ts[0].x, ts[0].y); await W.battleIdle();
     return true;
   };
+  // use signature abilities when they would matter
+  const ready = (id) => u.skills.includes(id) && R.skillTargets(s, u, id).length;
+  if (ready('chain') && await tryAct('chain')) return;
+  if (ready('stand') && R.alive(s, 'enemy').filter((e) => R.cheb(e, u) <= 1).length >= 2 && await tryAct('stand')) return;
+  if (ready('hour') && await tryAct('hour')) return;
   if (await tryAct(atk)) return;
   if (!u.moved) {
     b.chooseAction('move'); await W.tick(40);
